@@ -44,5 +44,12 @@ def sign_in(browser: webdriver.Chrome) -> None:
     password_input.send_keys(password)
     password_input.send_keys(Keys.RETURN)
 
-    wait = WebDriverWait(browser, 3)
-    wait.until(EC.title_contains("Planet Minecraft"))  # wait until we are redirected to homepage
+    try:
+        wait = WebDriverWait(browser, 3)
+        wait.until(EC.title_contains("Planet Minecraft"))  # wait until we are redirected to homepage
+    except:
+        email_input = browser.find_element(By.ID, "email")
+        email_input.send_keys(email)
+        password_input = browser.find_element(By.ID, "password")
+        password_input.send_keys(password)
+        print("HELP ME SIGN IN!!!")
