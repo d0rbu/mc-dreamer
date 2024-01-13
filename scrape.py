@@ -1,8 +1,6 @@
 import os
-import torch as th
-import time
-from core.pmc import get_next_page_button, sign_in, project_urls
-from core.browser import get_browser
+from core.scrape.pmc import get_next_page_button, sign_in, project_urls
+from core.scrape.browser import get_browser
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
