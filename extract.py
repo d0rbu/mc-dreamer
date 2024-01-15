@@ -1,5 +1,5 @@
 import os
-from core.extract.extract import extract_zipped_world
+from core.extract.extract import extract_world
 
 
 def extract_data(
@@ -12,7 +12,7 @@ def extract_data(
             continue
         
         if file.endswith(".zip") or os.path.isdir(file_path):
-            extract_zipped_world(file_path, output_dir)
+            extract_world(file_path, output_dir)
         else:
             print(f"Unknown file type: {file}")
 
