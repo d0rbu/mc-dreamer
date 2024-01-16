@@ -161,5 +161,4 @@ cython_debug/
 
 raw_outputs/
 intermediate_outputs/
-Python.h
 .vscode/
