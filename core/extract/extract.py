@@ -63,7 +63,7 @@ def extract_from_region(
     # ndarray_blocks = np.empty((REGION_BLOCK_LENGTH, CHUNK_HEIGHT, REGION_BLOCK_LENGTH), dtype=np.uint16)
     ndarray_blocks = np.empty((REGION_BLOCK_LENGTH, CHUNK_HEIGHT, REGION_BLOCK_LENGTH), dtype=object)
     for x, z in product(range(REGION_LENGTH), repeat=2):
-        chunk = anvil.Chunk.from_region(region, (x, z))
+        chunk = anvil.Chunk.from_region(region, x, z)
         for block_x, block_y, block_z in product(range(x, x + CHUNK_LENGTH), range(CHUNK_HEIGHT), range(z, z + CHUNK_LENGTH)):
             ndarray_blocks[block_x, block_y, block_z] = chunk.get_block(block_x, block_y, block_z).name()
     
@@ -161,6 +161,8 @@ async def extract_world_async(
     available_regions, region_indices = get_available_regions(region_dir)
     extracted_sample_futures = []
 
+    print("Setting up extraction tasks...")
+
     for x, z in region_indices:
         file_path = os.path.join(region_dir, f"r.{x}.{z}.mca")
         future = asyncio.Future()
@@ -172,11 +174,15 @@ async def extract_world_async(
     get_all_samples_future = asyncio.gather(*extracted_sample_futures)
     get_all_samples_future.add_done_callback(process_samples_callback)
 
+    print("Extracting samples from regions...")
+
     regular_samples = await get_all_samples_future
 
     vertical_edge_region_samples = available_regions[:-1] & available_regions[1:]
     horizontal_edge_region_samples = available_regions[:, :-1] & available_regions[:, 1:]
     corner_region_samples = available_regions[:-1, :-1] & available_regions[:-1, 1:] & available_regions[1:, :-1] & available_regions[1:, 1:]
+
+    print("Extracting samples from edges and corners...")
 
     unprocessed_samples = []
     for x, z in chain(np.nonzero(vertical_edge_region_samples), np.nonzero(horizontal_edge_region_samples)):
@@ -194,6 +200,8 @@ async def extract_world_async(
             os.path.join(region_dir, f"r.{x + 1}.{z + 1}.mca"),
         )
         unprocessed_samples.append(get_corner_samples(file_paths))
+    
+    print("Filtering extracted edge and corner samples...")
 
     extracted_sample_futures = []
     for unprocessed_sample in unprocessed_samples:
@@ -207,6 +215,8 @@ async def extract_world_async(
     get_all_samples_future.add_done_callback(process_samples_callback)
 
     edge_corner_samples = await get_all_samples_future
+
+    print("Saving extracted samples...")
 
     all_samples = np.concatenate((regular_samples, edge_corner_samples), axis=0)
 
