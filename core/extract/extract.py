@@ -43,14 +43,18 @@ def collate_samples(
 
 def extract_from_ndarray(
     dense_array: np.ndarray,
+    sample_size: tuple[int, int, int],
     future: asyncio.Future,
 ) -> None:
     extracted_samples = []
+
+    extracted_samples.append(dense_array[:sample_size[0], :sample_size[1], :sample_size[2]])
     
     future.set_result(extracted_samples)
 
 def extract_from_region(
     file_path: str | os.PathLike,
+    sample_size: tuple[int, int, int],
     future: asyncio.Future,
 ) -> None:
     with open(file_path, "rb") as region_file:
@@ -63,7 +67,7 @@ def extract_from_region(
         for block_x, block_y, block_z in product(range(x, x + CHUNK_LENGTH), range(CHUNK_HEIGHT), range(z, z + CHUNK_LENGTH)):
             ndarray_blocks[block_x, block_y, block_z] = chunk.get_block(block_x, block_y, block_z).name()
     
-    extract_from_ndarray(ndarray_blocks, future)
+    extract_from_ndarray(ndarray_blocks, sample_size, future)
 
 def get_edge_samples(
     file_paths: tuple[str | os.PathLike, str | os.PathLike],
@@ -146,6 +150,7 @@ def get_corner_samples(
 
 async def extract_world_async(
     path: str | os.PathLike,
+    sample_size: tuple[int, int, int] = (16, 16, 16),
     output_dir: str | os.PathLike = "outputs",
 ) -> None:
     if os.path.isfile(path):
@@ -160,15 +165,15 @@ async def extract_world_async(
         file_path = os.path.join(region_dir, f"r.{x}.{z}.mca")
         future = asyncio.Future()
         extracted_sample_futures.append(future)
-        asyncio.create_task(asyncio.to_thread(extract_from_region, file_path, future))
-    
+        asyncio.create_task(asyncio.to_thread(extract_from_region, file_path, sample_size, future))
+
     process_samples_callback = partial(collate_samples, output_path)
-    
+
     get_all_samples_future = asyncio.gather(*extracted_sample_futures)
     get_all_samples_future.add_done_callback(process_samples_callback)
 
     regular_samples = await get_all_samples_future
-    
+
     vertical_edge_region_samples = available_regions[:-1] & available_regions[1:]
     horizontal_edge_region_samples = available_regions[:, :-1] & available_regions[:, 1:]
     corner_region_samples = available_regions[:-1, :-1] & available_regions[:-1, 1:] & available_regions[1:, :-1] & available_regions[1:, 1:]
@@ -180,7 +185,7 @@ async def extract_world_async(
             os.path.join(region_dir, f"r.{x + 1}.{z}.mca"),
         )
         unprocessed_samples.append(get_edge_samples(file_paths, axis=0))
-    
+
     for x, z in np.nonzero(corner_region_samples):
         file_paths = (
             os.path.join(region_dir, f"r.{x}.{z}.mca"),
@@ -189,13 +194,13 @@ async def extract_world_async(
             os.path.join(region_dir, f"r.{x + 1}.{z + 1}.mca"),
         )
         unprocessed_samples.append(get_corner_samples(file_paths))
-    
+
     extracted_sample_futures = []
     for unprocessed_sample in unprocessed_samples:
         future = asyncio.Future()
         extracted_sample_futures.append(future)
-        asyncio.create_task(asyncio.to_thread(extract_from_ndarray, unprocessed_sample, future))
-    
+        asyncio.create_task(asyncio.to_thread(extract_from_ndarray, unprocessed_sample, sample_size, future))
+
     process_samples_callback = partial(collate_samples, output_path)
 
     get_all_samples_future = asyncio.gather(*extracted_sample_futures)
@@ -209,9 +214,10 @@ async def extract_world_async(
 
 def extract_world(
     path: str | os.PathLike,
+    sample_size: tuple[int, int, int] = (16, 16, 16),
     output_dir: str | os.PathLike = "outputs",
 ) -> None:
-    asyncio.run(extract_world_async(path, output_dir))
+    asyncio.run(extract_world_async(path, sample_size, output_dir))
 
 def extract_zipped_world(
     path: str | os.PathLike,
