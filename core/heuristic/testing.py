@@ -70,8 +70,15 @@ class Heuristics:
         return len(np.unique(sample)) / NUM_BLOCKS
     
     @staticmethod
-    def heuristic_1(sample: np.ndarray[int, int, int]) -> float:
-        return Heuristics.num_blocks(sample) + Heuristics.block_weighted(sample) * 4 + Heuristics.num_unique_blocks(sample) * 10
+    def heuristic_1(
+        sample: np.ndarray[int, int, int],
+        num_blocks_weight: float = 1.0,
+        block_weighted_weight: float = 4.0,
+        num_unique_blocks_weight: float = 10.0,
+    ) -> float:
+        return Heuristics.num_blocks(sample) * num_blocks_weight + \
+               Heuristics.block_weighted(sample) * block_weighted_weight + \
+               Heuristics.num_unique_blocks(sample) * num_unique_blocks_weight
 
 
 HEURISTICS: Sequence[Heuristic] = [
