@@ -152,9 +152,10 @@ async def extract_world_async(
     path: str | os.PathLike,
     sample_size: tuple[int, int, int] = (16, 16, 16),
     output_dir: str | os.PathLike = "outputs",
+    intermediate_output_dir: str | os.PathLike = "intermediate_outputs",
 ) -> None:
     if os.path.isfile(path):
-        path = extract_zipped_world(path)
+        path = extract_zipped_world(path, intermediate_output_dir)
 
     output_path = os.path.join(output_dir, os.path.basename(path))
     region_dir = os.path.join(path, "region")
@@ -226,8 +227,9 @@ def extract_world(
     path: str | os.PathLike,
     sample_size: tuple[int, int, int] = (16, 16, 16),
     output_dir: str | os.PathLike = "outputs",
+    intermediate_output_dir: str | os.PathLike = "intermediate_outputs",
 ) -> None:
-    asyncio.run(extract_world_async(path, sample_size, output_dir))
+    asyncio.run(extract_world_async(path, sample_size, output_dir, intermediate_output_dir))
 
 def extract_zipped_world(
     path: str | os.PathLike,
