@@ -25,11 +25,13 @@ class WorldSampleDataset(Dataset):
         sample_size: tuple[int, int, int] = (16, 16, 16),
         metadata_file: str | os.PathLike = "metadata.json",
         transform: th.nn.Module | None = None,
+        device: th.device = th.device("cpu"),
     ) -> None:
         super().__init__()
         self.data_dir = os.path.join(data_dir, split)
         self.sample_size = sample_size
         self.transform = transform
+        self.device = device
 
         assert os.path.isdir(self.data_dir), f"{self.data_dir} is not a directory"
 
@@ -56,7 +58,7 @@ class WorldSampleDataset(Dataset):
         self.sample_sizes = []
         for file_metadata in self.metadata.files:
             file_path = os.path.join(data_dir, file_metadata.name)
-            data = th.load(file_path)
+            data = th.load(file_path, map_location=self.device)
             self.data.append(data)
             self.volume_indices.append(th.nonzero(data))
             self.sample_sizes.append(file_metadata.num_samples)
