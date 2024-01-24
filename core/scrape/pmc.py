@@ -53,3 +53,6 @@ def sign_in(browser: webdriver.Chrome) -> None:
         password_input = browser.find_element(By.ID, "password")
         password_input.send_keys(password)
         print("HELP ME SIGN IN!!!")
+
+        wait = WebDriverWait(browser, float("inf"))
+        wait.until(EC.title_contains("Planet Minecraft"))
