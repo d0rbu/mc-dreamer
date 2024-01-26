@@ -165,3 +165,4 @@ outputs/
 .vscode/
 .idea/
 java/.idea
+test_inputs/

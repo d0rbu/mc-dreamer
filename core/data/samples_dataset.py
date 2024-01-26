@@ -1,18 +1,18 @@
 import os
 import json
-import pydantic
 import torch as th
 from torch.utils.data import Dataset
+from pydantic import BaseModel
 from typing import Self
 from functools import cache
 
 
-class FileMetadata(pydantic.BaseModel):
+class FileMetadata(BaseModel):
     name: str
     num_samples: int
 
 
-class DatasetMetadata(pydantic.BaseModel):
+class DatasetMetadata(BaseModel):
     total_samples: int
     files: list[FileMetadata]
 

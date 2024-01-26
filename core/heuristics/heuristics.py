@@ -2,17 +2,25 @@ import numpy as np
 from typing import Sequence, Callable
 
 
-Heuristic = Callable[[np.ndarray[int, int, int]], float]
+Heuristic = Callable[[np.ndarray], float]
 NUM_BLOCKS = 256
+
+
+_disabled_heuristics: set[Heuristic] = set()
+
+
+def DisableForTesting(heuristic: Heuristic) -> Heuristic:
+    _disabled_heuristics.add(heuristic)
+    return heuristic
 
 
 class Heuristics:
     @staticmethod
-    def num_blocks(sample: np.ndarray[int, int, int]) -> float:
+    def num_blocks(sample: np.ndarray) -> float:
         return np.mean(sample > 0)
 
     @staticmethod
-    def block_weighted(sample: np.ndarray[int, int, int]) -> float:
+    def block_weighted(sample: np.ndarray) -> float:
         block_weights = np.ones(NUM_BLOCKS)
         block_weights[0] = 0  # air is uninteresting
         block_weights[1:5] = 0.1  #  stone, grass, dirt, cobble
@@ -66,12 +74,12 @@ class Heuristics:
         return block_weights[sample].mean()
     
     @staticmethod
-    def num_unique_blocks(sample: np.ndarray[int, int, int]) -> float:
+    def num_unique_blocks(sample: np.ndarray) -> float:
         return len(np.unique(sample)) / NUM_BLOCKS
     
     @staticmethod
     def heuristic_1(
-        sample: np.ndarray[int, int, int],
+        sample: np.ndarray,
         num_blocks_weight: float = 1.0,
         block_weighted_weight: float = 4.0,
         num_unique_blocks_weight: float = 10.0,
@@ -84,5 +92,5 @@ class Heuristics:
 HEURISTICS: Sequence[Heuristic] = [
     heuristic
     for heuristic in Heuristics.__dict__.values()
-    if isinstance(heuristic, Callable)
+    if isinstance(heuristic, Callable) and heuristic not in _disabled_heuristics
 ]
