@@ -18,7 +18,8 @@ def _pprint_scores(
     longest_file_name = max(len(file) for file in files)
     longest_heuristic_name = max(len(heuristic) for heuristic in scores.keys())
 
-    print(" " * (longest_file_name + 3), end="")
+    print("\nHeuristic scores for each file")
+    print(f"{' ' * longest_file_name} | ", end="")
     for heuristic in HEURISTICS:
         print(f"{heuristic.__name__}{' ' * (longest_heuristic_name - len(heuristic.__name__))} | ", end="")
 
@@ -27,7 +28,7 @@ def _pprint_scores(
     for file in files:
         print(f"{file}{' ' * (longest_file_name - len(file))} | ", end="")
         for heuristic in HEURISTICS:
-            print(f"{scores[heuristic.__name__][file]:.4f}{' ' * (longest_heuristic_name - len(heuristic.__name__))} | ", end="")
+            print(f"{scores[heuristic.__name__][file]:.4f}{' ' * (longest_heuristic_name - 6)} | ", end="")
 
         print("\b\b ")
 
@@ -38,7 +39,8 @@ def _pprint_comparisons(
     longest_heuristic_name = max(len(heuristic.__name__) for heuristic in HEURISTICS)
     longest_ref_score_name = max(len(name) for name in ref_score_names)
 
-    print(" " * (longest_ref_score_name + 3), end="")
+    print("\nHeuristic losses")
+    print(f"{' ' * longest_ref_score_name} | ", end="")
     for heuristic in HEURISTICS:
         print(f"{heuristic.__name__}{' ' * (longest_heuristic_name - len(heuristic.__name__))} | ", end="")
 
@@ -53,7 +55,7 @@ def _pprint_comparisons(
             else:
                 score_string = f"{binary_cross_entropy:.4f}"
 
-            print(f"{score_string}{' ' * (longest_heuristic_name - len(heuristic.__name__))} | ", end="")
+            print(f"{score_string}{' ' * (longest_heuristic_name - 6)} | ", end="")
 
         print("\b\b ")
 

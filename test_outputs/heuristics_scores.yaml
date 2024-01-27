@@ -1,4 +1,8 @@
-block_weighted: {}
-heuristic_1: {}
-num_blocks: {}
-num_unique_blocks: {}
+block_weighted:
+  flat.npy: 0.0375
+heuristic_1:
+  flat.npy: 0.7203125
+num_blocks:
+  flat.npy: 0.375
+num_unique_blocks:
+  flat.npy: 0.01953125

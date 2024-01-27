@@ -17,7 +17,7 @@ def DisableForTesting(heuristic: Heuristic) -> Heuristic:
 class Heuristics:
     @staticmethod
     def num_blocks(sample: np.ndarray) -> float:
-        return np.mean(sample > 0)
+        return float(np.mean(sample > 0))
 
     @staticmethod
     def block_weighted(sample: np.ndarray) -> float:
@@ -71,7 +71,7 @@ class Heuristics:
         block_weights[179:183] = 0.1  # red sandstone
         block_weights[212:214] = 0.2  # frosted ice, magma block
 
-        return block_weights[sample].mean()
+        return float(block_weights[sample].mean())
     
     @staticmethod
     def num_unique_blocks(sample: np.ndarray) -> float:

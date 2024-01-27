@@ -7,6 +7,10 @@ def ref_scores_path() -> str:
     return "ref_scores.yaml"
 
 def get_ref_scores() -> dict[str, dict[str, float]]:
+    path = ref_scores_path()
+    if not os.path.exists(path):
+        return {}
+
     with open(ref_scores_path()) as f:
         return yaml.load(f, Loader=yaml.FullLoader)
 
@@ -25,6 +29,9 @@ def normalize_score(
 ) -> dict[str, float]:
     min_score = min(scores.values())
     max_score = max(scores.values())
+
+    if min_score == max_score:
+        return {name: 0.5 for name in scores.keys()}
 
     return {
         name: (score - min_score) / (max_score - min_score)
@@ -55,7 +62,8 @@ def average_ref_scores(
                 continue
 
             average_scores[file] += scores[file]
-        
+            num_scores += 1
+
         average_scores[file] /= num_scores
 
     return average_scores
