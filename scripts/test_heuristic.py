@@ -3,7 +3,7 @@ import yaml
 import numpy as np
 from core.heuristics.heuristics import HEURISTICS
 from core.heuristics.ref_scores import (
-    normalize_ref_scores,
+    normalize_scores,
     average_ref_scores,
     get_ref_scores,
     score_binary_cross_entropy,
@@ -88,21 +88,22 @@ def test_heuristics(
     
     _pprint_scores(scores, files)
 
+    normalized_scores = normalize_scores(scores)
     ref_scores = get_ref_scores()
-    normalized_ref_scores = normalize_ref_scores(get_ref_scores())
+    normalized_ref_scores = normalize_scores(ref_scores)
     avg_ref_scores = average_ref_scores(normalized_ref_scores)
-    if AVG_REF_SCORE_NAME in ref_scores:
+    if AVG_REF_SCORE_NAME in normalized_ref_scores:
         print(f"Warning: somebody's reference scores are already named 'avg', overwriting them")
-        del ref_scores[AVG_REF_SCORE_NAME]
+        del normalized_ref_scores[AVG_REF_SCORE_NAME]
 
-    ref_names = list(ref_scores.keys())
-    ref_names.insert(0, AVG_REF_SCORE_NAME)
+    ref_names = list(normalized_ref_scores.keys())
+    ref_names.append(AVG_REF_SCORE_NAME)
 
-    ref_scores[AVG_REF_SCORE_NAME] = avg_ref_scores
+    normalized_ref_scores[AVG_REF_SCORE_NAME] = avg_ref_scores
 
     comparisons = {
         heuristic.__name__: {
-            ref_name: score_binary_cross_entropy(ref_scores[ref_name], scores[heuristic.__name__])
+            ref_name: score_binary_cross_entropy(normalized_ref_scores[ref_name], normalized_scores[heuristic.__name__])
             for ref_name in ref_names
         }
         for heuristic in HEURISTICS

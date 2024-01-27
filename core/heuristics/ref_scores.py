@@ -38,12 +38,12 @@ def normalize_score(
         for name, score in scores.items()
     }
 
-def normalize_ref_scores(
-    ref_scores: dict[str, dict[str, float]],
+def normalize_scores(
+    scores: dict[str, dict[str, float]],
 ) -> dict[str, dict[str, float]]:
     return {
-        name: normalize_score(scores)
-        for name, scores in ref_scores.items()
+        name: normalize_score(score)
+        for name, score in scores.items()
     }
 
 def average_ref_scores(
