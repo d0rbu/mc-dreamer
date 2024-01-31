@@ -6,6 +6,7 @@ from nbtschematic import SchematicFile
 def convert_schematic(
     schematic_dir: str | os.PathLike = "raw_test_inputs",
     output_dir: str | os.PathLike = "test_inputs",
+    target_size: tuple[int, int, int] | None = (16, 16, 16),
 ) -> None:
     for file in os.listdir(schematic_dir):
         if not file.endswith(".schematic"):
@@ -26,6 +27,9 @@ def convert_schematic(
         y_size = int(sf.root["Height"])
         z_size = int(sf.root["Length"])
         x_size = int(sf.root["Width"])
+
+        if target_size is not None:
+            assert target_size == (x_size, y_size, z_size), f"{file} has a size of {(x_size, y_size, z_size)} but the target size is {target_size}"
 
         try:
             structure = np.copy(sf.blocks).astype(np.ubyte)
