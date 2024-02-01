@@ -71,6 +71,7 @@ def average_ref_scores(
 def score_binary_cross_entropy(
     base_scores: dict[str, float],
     approximated_scores: dict[str, float],
+    eps: float = 1e-6,
 ) -> float | None:
     shared_files = set(base_scores.keys()) & set(approximated_scores.keys())
 
@@ -78,6 +79,6 @@ def score_binary_cross_entropy(
         return None
 
     return -sum(
-        base_scores[file] * math.log(approximated_scores[file]) + (1 - base_scores[file]) * math.log(1 - approximated_scores[file])
+        base_scores[file] * math.log(approximated_scores[file] + eps) + (1 - base_scores[file]) * math.log(1 - approximated_scores[file] + eps)
         for file in shared_files
     ) / len(shared_files)

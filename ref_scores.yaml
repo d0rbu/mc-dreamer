@@ -1,5 +1,27 @@
 henry:
-  flat.npy: 0.0
+  air.npy: 0.0
+  colosseum.npy: 3.5
+  desert_arch.npy: 2.2
+  flat.npy: 0.2
+  freezer_truck.npy: 2.5
+  golf_clubhouse.npy: 8.0
+  grand_hotel.npy: 5.0
+  hi.npy: 2.0
+  hotel.npy: 8.8
+  jungle_ruin.npy: 4.1
+  medieval_house.npy: 8.9
+  modern_city_building.npy: 6.5
+  modern_house.npy: 4.2
+  nether_portal.npy: 3.0
+  ocean.npy: 1.0
+  redstone.npy: 2.2
+  server_spawn.npy: 3.4
+  ship.npy: 4.6
+  small_house.npy: 4.8
+  terrain_0.npy: 1.0
+  terrain_1.npy: 0.9
+  terrain_2.npy: 1.6
+  village_in_a_tree.npy: 2.1
 tanay:
   air.npy: 0.0
   colosseum.npy: 6.0
