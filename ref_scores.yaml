@@ -1,3 +1,75 @@
+Marcus Fojas:
+  air.npy: 0.0
+  colosseum.npy: 4.0
+  desert_arch.npy: 5.0
+  flat.npy: 2.0
+  freezer_truck.npy: 1.0
+  golf_clubhouse.npy: 8.0
+  grand_hotel.npy: 8.0
+  hi.npy: 6.0
+  hotel.npy: 9.0
+  jungle_ruin.npy: 7.0
+  medieval_house.npy: 9.0
+  modern_city_building.npy: 9.0
+  modern_house.npy: 9.0
+  nether_portal.npy: 5.0
+  ocean.npy: 3.0
+  redstone.npy: 3.0
+  server_spawn.npy: 7.0
+  ship.npy: 6.0
+  small_house.npy: 5.0
+  terrain_0.npy: 3.0
+  terrain_1.npy: 4.0
+  terrain_2.npy: 4.0
+  village_in_a_tree.npy: 2.0
+Tyler:
+  air.npy: 0.0
+  colosseum.npy: 7.0
+  desert_arch.npy: 4.0
+  flat.npy: 0.0
+  freezer_truck.npy: 3.0
+  golf_clubhouse.npy: 8.0
+  grand_hotel.npy: 6.0
+  hi.npy: 4.0
+  hotel.npy: 9.0
+  jungle_ruin.npy: 6.0
+  medieval_house.npy: 10.0
+  modern_city_building.npy: 8.0
+  modern_house.npy: 8.0
+  nether_portal.npy: 5.0
+  ocean.npy: 0.0
+  redstone.npy: 5.0
+  server_spawn.npy: 4.0
+  ship.npy: 4.0
+  small_house.npy: 4.0
+  terrain_0.npy: 0.0
+  terrain_1.npy: 1.0
+  terrain_2.npy: 1.0
+  village_in_a_tree.npy: 3.0
+Yeexiex:
+  air.npy: 0.0
+  colosseum.npy: 3.0
+  desert_arch.npy: 7.0
+  flat.npy: 1.0
+  freezer_truck.npy: 2.0
+  golf_clubhouse.npy: 4.0
+  grand_hotel.npy: 7.0
+  hi.npy: 4.0
+  hotel.npy: 3.0
+  jungle_ruin.npy: 2.0
+  medieval_house.npy: 10.0
+  modern_city_building.npy: 6.0
+  modern_house.npy: 4.0
+  nether_portal.npy: 1.0
+  ocean.npy: 0.0
+  redstone.npy: 2.0
+  server_spawn.npy: 3.0
+  ship.npy: 3.0
+  small_house.npy: 5.0
+  terrain_0.npy: 1.0
+  terrain_1.npy: 2.0
+  terrain_2.npy: 2.0
+  village_in_a_tree.npy: 5.0
 henry:
   air.npy: 0.0
   colosseum.npy: 3.5
@@ -22,6 +94,30 @@ henry:
   terrain_1.npy: 0.9
   terrain_2.npy: 1.6
   village_in_a_tree.npy: 2.1
+kina:
+  air.npy: 0.0
+  colosseum.npy: 7.0
+  desert_arch.npy: 9.0
+  flat.npy: 0.0
+  freezer_truck.npy: 7.0
+  golf_clubhouse.npy: 9.5
+  grand_hotel.npy: 8.7
+  hi.npy: 6.0
+  hotel.npy: 7.0
+  jungle_ruin.npy: 8.9
+  medieval_house.npy: 10.0
+  modern_city_building.npy: 8.9
+  modern_house.npy: 8.2
+  nether_portal.npy: 6.0
+  ocean.npy: 2.0
+  redstone.npy: 7.0
+  server_spawn.npy: 7.5
+  ship.npy: 5.0
+  small_house.npy: 4.5
+  terrain_0.npy: 1.0
+  terrain_1.npy: 1.0
+  terrain_2.npy: 2.0
+  village_in_a_tree.npy: 4.5
 tanay:
   air.npy: 0.0
   colosseum.npy: 6.0
