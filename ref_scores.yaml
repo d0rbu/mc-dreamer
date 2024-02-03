@@ -70,6 +70,30 @@ Yeexiex:
   terrain_1.npy: 2.0
   terrain_2.npy: 2.0
   village_in_a_tree.npy: 5.0
+UM,ER-2:
+  air.npy: 3.0
+  colosseum.npy: 7.5
+  desert_arch.npy: 7.0
+  flat.npy: 2.0
+  freezer_truck.npy: 6.0
+  golf_clubhouse.npy: 7.0
+  grand_hotel.npy: 7.5
+  hi.npy: 6.0
+  hotel.npy: 6.5
+  jungle_ruin.npy: 9.5
+  medieval_house.npy: 9.0
+  modern_city_building.npy: 6.5
+  modern_house.npy: 5.0
+  nether_portal.npy: 7.5
+  ocean.npy: 5.0
+  redstone.npy: 8.0
+  server_spawn.npy: 5.0
+  ship.npy: 5.0
+  small_house.npy: 6.0
+  terrain_0.npy: 8.0
+  terrain_1.npy: 7.5
+  terrain_2.npy: 7.0
+  village_in_a_tree.npy: 8.0
 henry:
   air.npy: 0.0
   colosseum.npy: 3.5
@@ -142,3 +166,51 @@ tanay:
   terrain_1.npy: 1.5
   terrain_2.npy: 2.0
   village_in_a_tree.npy: 2.0
+umer-0:
+  air.npy: 3.0
+  colosseum.npy: 2.6
+  desert_arch.npy: 5.0
+  flat.npy: 4.0
+  freezer_truck.npy: 3.6
+  golf_clubhouse.npy: 8.7
+  grand_hotel.npy: 6.0
+  hi.npy: 2.0
+  hotel.npy: 5.7
+  jungle_ruin.npy: 9.2
+  medieval_house.npy: 9.1
+  modern_city_building.npy: 6.2
+  modern_house.npy: 8.7
+  nether_portal.npy: 4.0
+  ocean.npy: 3.4
+  redstone.npy: 4.1
+  server_spawn.npy: 4.0
+  ship.npy: 5.1
+  small_house.npy: 3.6
+  terrain_0.npy: 6.1
+  terrain_1.npy: 7.3
+  terrain_2.npy: 8.4
+  village_in_a_tree.npy: 7.1
+umer-1:
+  air.npy: 2.0
+  colosseum.npy: 7.5
+  desert_arch.npy: 6.0
+  flat.npy: 3.0
+  freezer_truck.npy: 6.0
+  golf_clubhouse.npy: 7.0
+  grand_hotel.npy: 8.0
+  hi.npy: 6.0
+  hotel.npy: 9.0
+  jungle_ruin.npy: 8.0
+  medieval_house.npy: 7.0
+  modern_city_building.npy: 7.0
+  modern_house.npy: 8.0
+  nether_portal.npy: 7.0
+  ocean.npy: 5.0
+  redstone.npy: 8.0
+  server_spawn.npy: 7.0
+  ship.npy: 5.0
+  small_house.npy: 5.0
+  terrain_0.npy: 4.0
+  terrain_1.npy: 4.0
+  terrain_2.npy: 7.0
+  village_in_a_tree.npy: 9.0
