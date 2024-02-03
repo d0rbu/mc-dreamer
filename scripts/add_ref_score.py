@@ -10,7 +10,12 @@ def add_heuristic_reference_score(
     name = input("Enter name: ")
     confirmed = False
     while not confirmed:
-        print("Score each reference file from 0 to 10.\n")
+        print("Score each reference file from 0 to 10.")
+        print("Score them purely on their creative quality, " \
+              "and do not take the file names into account. " \
+              "Ask yourself, \"Out of context, if an AI model " \
+              "generated this sample, how impressed would I be " \
+              "on a scale from 0 to 10?\"\n")
 
         score = {}
 
