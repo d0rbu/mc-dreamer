@@ -10,25 +10,27 @@ from core.heuristics.ref_scores import (
 )
 from typing import Sequence
 
+SCORE_WIDTH = 6
+
 
 def _pprint_scores(
     scores: dict[str, dict[str, float]],
     files: list[str],
 ) -> None:
     longest_file_name = max(len(file) for file in files)
-    longest_heuristic_name = max(len(heuristic) for heuristic in scores.keys())
 
     print("\nHeuristic scores for each file")
     print(f"{' ' * longest_file_name} | ", end="")
     for heuristic in HEURISTICS:
-        print(f"{heuristic.__name__}{' ' * (longest_heuristic_name - len(heuristic.__name__))} | ", end="")
+        print(f"{heuristic.__name__} | ", end="")
 
     print("\b\b ")
 
     for file in files:
         print(f"{file}{' ' * (longest_file_name - len(file))} | ", end="")
         for heuristic in HEURISTICS:
-            print(f"{scores[heuristic.__name__][file]:.4f}{' ' * (longest_heuristic_name - 6)} | ", end="")
+            width = max(SCORE_WIDTH, len(heuristic.__name__))
+            print(f"{scores[heuristic.__name__][file]:.4f}{' ' * (width - SCORE_WIDTH)} | ", end="")
 
         print("\b\b ")
 
@@ -36,26 +38,26 @@ def _pprint_comparisons(
     ref_score_names: Sequence[str],
     comparisons: dict[str, dict[str, float]],
 ) -> None:
-    longest_heuristic_name = max(len(heuristic.__name__) for heuristic in HEURISTICS)
     longest_ref_score_name = max(len(name) for name in ref_score_names)
 
     print("\nHeuristic losses")
     print(f"{' ' * longest_ref_score_name} | ", end="")
     for heuristic in HEURISTICS:
-        print(f"{heuristic.__name__}{' ' * (longest_heuristic_name - len(heuristic.__name__))} | ", end="")
+        print(f"{heuristic.__name__} | ", end="")
 
     print("\b\b ")
 
     for ref_score_name in ref_score_names:
         print(f"{ref_score_name}{' ' * (longest_ref_score_name - len(ref_score_name))} | ", end="")
         for heuristic in HEURISTICS:
+            width = max(SCORE_WIDTH, len(heuristic.__name__))
             binary_cross_entropy = comparisons[heuristic.__name__][ref_score_name]
             if binary_cross_entropy is None:
                 score_string = "NaN "
             else:
                 score_string = f"{binary_cross_entropy:.4f}"
 
-            print(f"{score_string}{' ' * (longest_heuristic_name - 6)} | ", end="")
+            print(f"{score_string}{' ' * (width - SCORE_WIDTH)} | ", end="")
 
         print("\b\b ")
 
