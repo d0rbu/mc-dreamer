@@ -3,8 +3,10 @@ import zipfile
 import anvil
 import numpy as np
 import torch as th
-from functools import partial
+from uuid import uuid4
+from mpi4py import MPI
 from itertools import chain, product
+from more_itertools import chunked
 from typing import Sequence
 
 
@@ -12,6 +14,8 @@ CHUNK_LENGTH = 16  # in blocks
 CHUNK_HEIGHT = 256  # in blocks
 REGION_LENGTH = 32  # in chunks
 REGION_BLOCK_LENGTH = REGION_LENGTH * CHUNK_LENGTH  # in blocks
+
+COMM = MPI.COMM_WORLD
 
 def get_available_regions(region_dir: str | os.PathLike) -> tuple[np.ndarray, Sequence[tuple[int, int]]]:
     region_files = [file for file in os.listdir(region_dir) if file.endswith(".mca")]
@@ -56,6 +60,7 @@ def extract_from_region(
         # ndarray_blocks = np.empty((REGION_BLOCK_LENGTH, CHUNK_HEIGHT, REGION_BLOCK_LENGTH), dtype=np.uint16)
         ndarray_blocks = np.empty((REGION_BLOCK_LENGTH, CHUNK_HEIGHT, REGION_BLOCK_LENGTH), dtype=object)
         for x, z in product(range(REGION_LENGTH), repeat=2):
+            import pdb; pdb.set_trace()
             chunk = anvil.Chunk.from_region(region, x, z)
             for block_x, block_y, block_z in product(range(x, x + CHUNK_LENGTH), range(CHUNK_HEIGHT), range(z, z + CHUNK_LENGTH)):
                 ndarray_blocks[block_x, block_y, block_z] = chunk.get_block(block_x, block_y, block_z).name()
@@ -143,6 +148,23 @@ def get_corner_samples(
 
     return sliced_corner_region
 
+def save_samples(
+    samples: list[np.ndarray],
+    output_dir: str | os.PathLike,
+) -> list[np.ndarray]:
+    while len(samples) >= SAMPLES_PER_FILE:
+        sample_tensor = th.tensor(samples[:SAMPLES_PER_FILE], dtype=th.uint8)
+        th.save(sample_tensor, os.path.join(output_dir, str(uuid4()) + ".pt"))
+        samples = samples[SAMPLES_PER_FILE:]
+
+    return samples
+
+_print = print
+# only print from rank 0
+def print(*args, **kwargs):
+    if COMM.Get_rank() == 0:
+        _print(*args, **kwargs)
+
 SAMPLES_PER_FILE = 2048
 
 def extract_world(
@@ -158,12 +180,18 @@ def extract_world(
     region_dir = os.path.join(path, "region")
     available_regions, region_indices = get_available_regions(region_dir)
     extracted_samples = []
+    rank = COMM.Get_rank()
+    world_size = COMM.Get_size()
+    os.makedirs(output_dir, exist_ok=True)
 
     print("Extracting samples from regions...")
 
-    for x, z in region_indices:
+    for region_index_chunk in chunked(region_indices, world_size):
+        x, z = region_index_chunk[rank]
         file_path = os.path.join(region_dir, f"r.{x}.{z}.mca")
         extracted_samples.extend(extract_from_region(file_path, sample_size))
+
+        extracted_samples = save_samples(extracted_samples, output_dir)
 
     vertical_edge_region_samples = available_regions[:-1] & available_regions[1:]
     horizontal_edge_region_samples = available_regions[:, :-1] & available_regions[:, 1:]
@@ -172,7 +200,8 @@ def extract_world(
     print("Extracting samples from edges and corners...")
 
     unprocessed_samples = {}
-    for x, z in np.nonzero(vertical_edge_region_samples):
+    for sample_index_chunk in chunked(np.nonzero(vertical_edge_region_samples), world_size):
+        x, z = sample_index_chunk[rank]
         file_paths = (
             os.path.join(region_dir, f"r.{x}.{z}.mca"),
             os.path.join(region_dir, f"r.{x + 1}.{z}.mca"),
@@ -183,7 +212,8 @@ def extract_world(
         else:
             unprocessed_samples[new_file_path] = get_edge_samples(file_paths, axis=0)
 
-    for x, z in np.nonzero(horizontal_edge_region_samples):
+    for sample_index_chunk in chunked(np.nonzero(horizontal_edge_region_samples), world_size):
+        x, z = sample_index_chunk[rank]
         file_paths = (
             os.path.join(region_dir, f"r.{x}.{z}.mca"),
             os.path.join(region_dir, f"r.{x}.{z + 1}.mca"),
@@ -194,7 +224,8 @@ def extract_world(
         else:
             unprocessed_samples[new_file_path] = get_edge_samples(file_paths, axis=2)
 
-    for x, z in np.nonzero(corner_region_samples):
+    for sample_index_chunk in chunked(np.nonzero(corner_region_samples), world_size):
+        x, z = sample_index_chunk[rank]
         file_paths = (
             os.path.join(region_dir, f"r.{x}.{z}.mca"),
             os.path.join(region_dir, f"r.{x + 1}.{z}.mca"),
@@ -212,11 +243,7 @@ def extract_world(
     for unprocessed_sample in unprocessed_samples:
         extracted_samples.extend(extract_from_ndarray(unprocessed_sample, sample_size))
 
-    print("Saving extracted samples...")
-    os.makedirs(output_dir, exist_ok=True)
-    for i, j in enumerate(range(0, len(extracted_samples), SAMPLES_PER_FILE)):
-        sample_tensor = th.tensor(extracted_samples[j:j + SAMPLES_PER_FILE], dtype=th.uint8)
-        th.save(sample_tensor, os.path.join(output_dir, f"samples_{i}.pt"))
+        extracted_samples = save_samples(extracted_samples, output_dir)
 
     print("Done")
 
