@@ -1,8 +1,8 @@
 import os
 import zipfile
-import asyncio
 import anvil
 import numpy as np
+import torch as th
 from functools import partial
 from itertools import chain, product
 from typing import Sequence
@@ -32,42 +32,37 @@ def get_available_regions(region_dir: str | os.PathLike) -> tuple[np.ndarray, Se
 
     return available_regions, zip(available_region_x, available_region_z)
 
-def collate_samples(
-    output_dir: str | os.PathLike,
-    samples_future: asyncio.Future,
-) -> np.ndarray:
-    all_samples = samples_future.result()
-    samples = np.concatenate(all_samples, axis=0)
-
-    return samples
-
 def extract_from_ndarray(
     dense_array: np.ndarray,
     sample_size: tuple[int, int, int],
-    future: asyncio.Future,
-) -> None:
+) -> list[np.ndarray]:
     extracted_samples = []
 
-    extracted_samples.append(dense_array[:sample_size[0], :sample_size[1], :sample_size[2]])
-    
-    future.set_result(extracted_samples)
+    # extracted_samples.append(dense_array[:sample_size[0], :sample_size[1], :sample_size[2]])
+
+    return extracted_samples
 
 def extract_from_region(
     file_path: str | os.PathLike,
     sample_size: tuple[int, int, int],
-    future: asyncio.Future,
-) -> None:
-    with open(file_path, "rb") as region_file:
-        region = anvil.Region.from_file(region_file)
+) -> list[np.ndarray]:
+    ndarray_filepath = file_path.replace(".mca", ".npy")
+    if os.path.exists(ndarray_filepath):
+        ndarray_blocks = np.load(ndarray_filepath)
+    else:
+        with open(file_path, "rb") as region_file:
+            region = anvil.Region.from_file(region_file)
 
-    # ndarray_blocks = np.empty((REGION_BLOCK_LENGTH, CHUNK_HEIGHT, REGION_BLOCK_LENGTH), dtype=np.uint16)
-    ndarray_blocks = np.empty((REGION_BLOCK_LENGTH, CHUNK_HEIGHT, REGION_BLOCK_LENGTH), dtype=object)
-    for x, z in product(range(REGION_LENGTH), repeat=2):
-        chunk = anvil.Chunk.from_region(region, x, z)
-        for block_x, block_y, block_z in product(range(x, x + CHUNK_LENGTH), range(CHUNK_HEIGHT), range(z, z + CHUNK_LENGTH)):
-            ndarray_blocks[block_x, block_y, block_z] = chunk.get_block(block_x, block_y, block_z).name()
-    
-    extract_from_ndarray(ndarray_blocks, sample_size, future)
+        # ndarray_blocks = np.empty((REGION_BLOCK_LENGTH, CHUNK_HEIGHT, REGION_BLOCK_LENGTH), dtype=np.uint16)
+        ndarray_blocks = np.empty((REGION_BLOCK_LENGTH, CHUNK_HEIGHT, REGION_BLOCK_LENGTH), dtype=object)
+        for x, z in product(range(REGION_LENGTH), repeat=2):
+            chunk = anvil.Chunk.from_region(region, x, z)
+            for block_x, block_y, block_z in product(range(x, x + CHUNK_LENGTH), range(CHUNK_HEIGHT), range(z, z + CHUNK_LENGTH)):
+                ndarray_blocks[block_x, block_y, block_z] = chunk.get_block(block_x, block_y, block_z).name()
+
+        np.save(ndarray_filepath, ndarray_blocks)
+
+    return extract_from_ndarray(ndarray_blocks, sample_size)
 
 def get_edge_samples(
     file_paths: tuple[str | os.PathLike, str | os.PathLike],
@@ -148,7 +143,9 @@ def get_corner_samples(
 
     return sliced_corner_region
 
-async def extract_world_async(
+SAMPLES_PER_FILE = 2048
+
+def extract_world(
     path: str | os.PathLike,
     sample_size: tuple[int, int, int] = (16, 16, 16),
     output_dir: str | os.PathLike = "outputs",
@@ -157,27 +154,16 @@ async def extract_world_async(
     if os.path.isfile(path):
         path = extract_zipped_world(path, intermediate_output_dir)
 
-    output_path = os.path.join(output_dir, os.path.basename(path))
+    output_dir = os.path.join(output_dir, os.path.basename(path))
     region_dir = os.path.join(path, "region")
     available_regions, region_indices = get_available_regions(region_dir)
-    extracted_sample_futures = []
-
-    print("Setting up extraction tasks...")
-
-    for x, z in region_indices:
-        file_path = os.path.join(region_dir, f"r.{x}.{z}.mca")
-        future = asyncio.Future()
-        extracted_sample_futures.append(future)
-        asyncio.create_task(asyncio.to_thread(extract_from_region, file_path, sample_size, future))
-
-    process_samples_callback = partial(collate_samples, output_path)
-
-    get_all_samples_future = asyncio.gather(*extracted_sample_futures)
-    get_all_samples_future.add_done_callback(process_samples_callback)
+    extracted_samples = []
 
     print("Extracting samples from regions...")
 
-    regular_samples = await get_all_samples_future
+    for x, z in region_indices:
+        file_path = os.path.join(region_dir, f"r.{x}.{z}.mca")
+        extracted_samples.extend(extract_from_region(file_path, sample_size))
 
     vertical_edge_region_samples = available_regions[:-1] & available_regions[1:]
     horizontal_edge_region_samples = available_regions[:, :-1] & available_regions[:, 1:]
@@ -185,13 +171,28 @@ async def extract_world_async(
 
     print("Extracting samples from edges and corners...")
 
-    unprocessed_samples = []
-    for x, z in chain(np.nonzero(vertical_edge_region_samples), np.nonzero(horizontal_edge_region_samples)):
+    unprocessed_samples = {}
+    for x, z in np.nonzero(vertical_edge_region_samples):
         file_paths = (
             os.path.join(region_dir, f"r.{x}.{z}.mca"),
             os.path.join(region_dir, f"r.{x + 1}.{z}.mca"),
         )
-        unprocessed_samples.append(get_edge_samples(file_paths, axis=0))
+        new_file_path = os.path.join(region_dir, f"r.{x}-{x + 1}.{z}.npy")
+        if os.path.exists(new_file_path):
+            unprocessed_samples[new_file_path] = np.load(new_file_path)
+        else:
+            unprocessed_samples[new_file_path] = get_edge_samples(file_paths, axis=0)
+
+    for x, z in np.nonzero(horizontal_edge_region_samples):
+        file_paths = (
+            os.path.join(region_dir, f"r.{x}.{z}.mca"),
+            os.path.join(region_dir, f"r.{x}.{z + 1}.mca"),
+        )
+        new_file_path = os.path.join(region_dir, f"r.{x}.{z}-{z + 1}.npy")
+        if os.path.exists(new_file_path):
+            unprocessed_samples[new_file_path] = np.load(new_file_path)
+        else:
+            unprocessed_samples[new_file_path] = get_edge_samples(file_paths, axis=2)
 
     for x, z in np.nonzero(corner_region_samples):
         file_paths = (
@@ -200,36 +201,24 @@ async def extract_world_async(
             os.path.join(region_dir, f"r.{x}.{z + 1}.mca"),
             os.path.join(region_dir, f"r.{x + 1}.{z + 1}.mca"),
         )
-        unprocessed_samples.append(get_corner_samples(file_paths))
-    
+        new_file_path = os.path.join(region_dir, f"r.{x}-{x + 1}.{z}-{z + 1}.npy")
+        if os.path.exists(new_file_path):
+            unprocessed_samples[new_file_path] = np.load(new_file_path)
+        else:
+            unprocessed_samples[new_file_path] = get_corner_samples(file_paths)
+
     print("Filtering extracted edge and corner samples...")
 
-    extracted_sample_futures = []
     for unprocessed_sample in unprocessed_samples:
-        future = asyncio.Future()
-        extracted_sample_futures.append(future)
-        asyncio.create_task(asyncio.to_thread(extract_from_ndarray, unprocessed_sample, sample_size, future))
-
-    process_samples_callback = partial(collate_samples, output_path)
-
-    get_all_samples_future = asyncio.gather(*extracted_sample_futures)
-    get_all_samples_future.add_done_callback(process_samples_callback)
-
-    edge_corner_samples = await get_all_samples_future
+        extracted_samples.extend(extract_from_ndarray(unprocessed_sample, sample_size))
 
     print("Saving extracted samples...")
+    os.makedirs(output_dir, exist_ok=True)
+    for i, j in enumerate(range(0, len(extracted_samples), SAMPLES_PER_FILE)):
+        sample_tensor = th.tensor(extracted_samples[j:j + SAMPLES_PER_FILE], dtype=th.uint8)
+        th.save(sample_tensor, os.path.join(output_dir, f"samples_{i}.pt"))
 
-    all_samples = np.concatenate((regular_samples, edge_corner_samples), axis=0)
-
-    np.save(output_path, all_samples)
-
-def extract_world(
-    path: str | os.PathLike,
-    sample_size: tuple[int, int, int] = (16, 16, 16),
-    output_dir: str | os.PathLike = "outputs",
-    intermediate_output_dir: str | os.PathLike = "intermediate_outputs",
-) -> None:
-    asyncio.run(extract_world_async(path, sample_size, output_dir, intermediate_output_dir))
+    print("Done")
 
 def extract_zipped_world(
     path: str | os.PathLike,
