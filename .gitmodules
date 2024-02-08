@@ -1,0 +1,3 @@
+[submodule "anvil"]
+	path = anvil
+	url = https://github.com/d0rbu/anvil-compat

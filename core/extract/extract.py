@@ -1,6 +1,6 @@
 import os
 import zipfile
-import anvil
+import anvil.anvil as anvil
 import numpy as np
 import torch as th
 from uuid import uuid4
@@ -59,11 +59,11 @@ def extract_from_region(
 
         # ndarray_blocks = np.empty((REGION_BLOCK_LENGTH, CHUNK_HEIGHT, REGION_BLOCK_LENGTH), dtype=np.uint16)
         ndarray_blocks = np.empty((REGION_BLOCK_LENGTH, CHUNK_HEIGHT, REGION_BLOCK_LENGTH), dtype=object)
-        for x, z in product(range(REGION_LENGTH), repeat=2):
-            import pdb; pdb.set_trace()
-            chunk = anvil.Chunk.from_region(region, x, z)
-            for block_x, block_y, block_z in product(range(x, x + CHUNK_LENGTH), range(CHUNK_HEIGHT), range(z, z + CHUNK_LENGTH)):
-                ndarray_blocks[block_x, block_y, block_z] = chunk.get_block(block_x, block_y, block_z).name()
+        for chunk_x, chunk_z in product(range(REGION_LENGTH), repeat=2):
+            chunk = anvil.Chunk.from_region(region, chunk_x, chunk_z)
+            for block_x, block_y, block_z in product(range(CHUNK_LENGTH), range(CHUNK_HEIGHT), range(CHUNK_LENGTH)):
+                x, y, z = chunk_x * CHUNK_LENGTH + block_x, block_y, chunk_z * CHUNK_LENGTH + block_z
+                ndarray_blocks[x, y, z] = chunk.get_block(block_x, block_y, block_z).name()
 
         np.save(ndarray_filepath, ndarray_blocks)
 
