@@ -221,7 +221,7 @@ class Heuristics:
     ) -> float:
         return min(punish_boring * Heuristics.block_weighted(sample), punish_crazy * Heuristics.too_crazy(sample))
 
-    @staticmethod        
+    @staticmethod
     def height_variance(sample: np.ndarray) -> float:
         height_variance = len(np.nonzero(sample > 0)[1])  # Variance in the height of non-air blocks
         print(height_variance/16)
@@ -233,6 +233,14 @@ class Heuristics:
         if(num_blocks <= good_count):
             return num_blocks/good_count
         return 1- (num_blocks - good_count)/256
+
+
+class OptimizedHeuristics:
+    @staticmethod
+    def num_blocks(sample: np.ndarray) -> float:
+        # sample is now a 256-dimensional vector containing block counts
+        sample[0] = 0
+        return float(sample.sum())
 
 HEURISTICS: Sequence[Heuristic] = [
     heuristic
