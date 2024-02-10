@@ -106,6 +106,7 @@ def test_heuristics(
     comparisons = {
         heuristic.__name__: {
             ref_name: score_binary_cross_entropy(normalized_ref_scores[ref_name], normalized_scores[heuristic.__name__])
+            
             for ref_name in ref_names
         }
         for heuristic in HEURISTICS
