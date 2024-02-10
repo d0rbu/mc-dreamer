@@ -1,27 +1,27 @@
 block_weighted:
   air.npy: 0.0
-  colosseum.npy: 0.042578124999999994
-  desert_arch.npy: 0.063330078125
-  flat.npy: 0.0375
-  freezer_truck.npy: 0.03125
-  golf_clubhouse.npy: 0.2658935546875
-  grand_hotel.npy: 0.0718994140625
-  hi.npy: 0.1640625
-  hotel.npy: 0.3481689453125
-  jungle_ruin.npy: 0.13134765625
-  medieval_house.npy: 0.2865234375
-  modern_city_building.npy: 0.231201171875
-  modern_house.npy: 0.17844238281250002
-  nether_portal.npy: 0.041308593750000004
-  ocean.npy: 0.10000000000000002
-  redstone.npy: 0.123779296875
-  server_spawn.npy: 0.0952392578125
-  ship.npy: 0.08281250000000001
-  small_house.npy: 0.0568359375
-  terrain_0.npy: 0.049755859375
-  terrain_1.npy: 0.0726318359375
-  terrain_2.npy: 0.05791015625
-  village_in_a_tree.npy: 0.21779785156249998
+  colosseum.npy: 0.0450927734375
+  desert_arch.npy: 0.07343750000000002
+  flat.npy: 0.06874999999999999
+  freezer_truck.npy: 0.015625
+  golf_clubhouse.npy: 0.1438720703125
+  grand_hotel.npy: 0.06982421875
+  hi.npy: 0.08203125
+  hotel.npy: 0.19267578125
+  jungle_ruin.npy: 0.12238769531249999
+  medieval_house.npy: 0.1627197265625
+  modern_city_building.npy: 0.13623046875
+  modern_house.npy: 0.2519287109375
+  nether_portal.npy: 0.026074218750000003
+  ocean.npy: 0.1412841796875
+  redstone.npy: 0.0618896484375
+  server_spawn.npy: 0.11831054687500002
+  ship.npy: 0.048364257812500006
+  small_house.npy: 0.02939453125
+  terrain_0.npy: 0.0963623046875
+  terrain_1.npy: 0.1390380859375
+  terrain_2.npy: 0.09892578125
+  village_in_a_tree.npy: 0.25986328125
 fewer_blocks:
   air.npy: 0.000390625
   colosseum.npy: 0.003515625
@@ -72,51 +72,51 @@ height_variance:
   village_in_a_tree.npy: 164.0625
 heuristic_1:
   air.npy: 0.0390625
-  colosseum.npy: 0.694970703125
-  desert_arch.npy: 1.073388671875
-  flat.npy: 0.7203125
-  freezer_truck.npy: 0.4296875
-  golf_clubhouse.npy: 2.577490234375
-  grand_hotel.npy: 1.296875
-  hi.npy: 0.9375
-  hotel.npy: 3.281591796875
-  jungle_ruin.npy: 1.391845703125
-  medieval_house.npy: 2.120947265625
-  modern_city_building.npy: 1.634521484375
-  modern_house.npy: 1.9818359375
-  nether_portal.npy: 0.47871093750000004
-  ocean.npy: 1.4781250000000001
-  redstone.npy: 1.048583984375
-  server_spawn.npy: 1.451513671875
-  ship.npy: 0.667919921875
-  small_house.npy: 0.5212890625
-  terrain_0.npy: 1.043505859375
-  terrain_1.npy: 1.352294921875
-  terrain_2.npy: 1.171826171875
-  village_in_a_tree.npy: 2.058935546875
+  colosseum.npy: 0.705029296875
+  desert_arch.npy: 1.1138183593750002
+  flat.npy: 0.8453124999999999
+  freezer_truck.npy: 0.3671875
+  golf_clubhouse.npy: 2.089404296875
+  grand_hotel.npy: 1.28857421875
+  hi.npy: 0.609375
+  hotel.npy: 2.659619140625
+  jungle_ruin.npy: 1.356005859375
+  medieval_house.npy: 1.625732421875
+  modern_city_building.npy: 1.254638671875
+  modern_house.npy: 2.27578125
+  nether_portal.npy: 0.4177734375
+  ocean.npy: 1.64326171875
+  redstone.npy: 0.801025390625
+  server_spawn.npy: 1.5437988281250001
+  ship.npy: 0.530126953125
+  small_house.npy: 0.4115234375
+  terrain_0.npy: 1.229931640625
+  terrain_1.npy: 1.617919921875
+  terrain_2.npy: 1.335888671875
+  village_in_a_tree.npy: 2.227197265625
 intresing_decency:
   air.npy: 0.0
-  colosseum.npy: 0.042578124999999994
-  desert_arch.npy: 0.063330078125
-  flat.npy: 0.0375
-  freezer_truck.npy: 0.03125
-  golf_clubhouse.npy: 0.2658935546875
-  grand_hotel.npy: 0.0718994140625
-  hi.npy: 0.09000000000000008
-  hotel.npy: 0.29176114474408354
-  jungle_ruin.npy: 0.13134765625
-  medieval_house.npy: 0.19614096301465456
-  modern_city_building.npy: 0.231201171875
-  modern_house.npy: 0.17844238281250002
-  nether_portal.npy: 0.041308593750000004
-  ocean.npy: 0.10000000000000002
-  redstone.npy: 0.09000000000000008
-  server_spawn.npy: 0.0952392578125
-  ship.npy: 0.08281250000000001
-  small_house.npy: 0.0568359375
-  terrain_0.npy: 0.049755859375
-  terrain_1.npy: 0.0726318359375
-  terrain_2.npy: 0.05791015625
+  colosseum.npy: 0.0450927734375
+  desert_arch.npy: 0.07343750000000002
+  flat.npy: 0.06874999999999999
+  freezer_truck.npy: 0.015625
+  golf_clubhouse.npy: 0.1438720703125
+  grand_hotel.npy: 0.06982421875
+  hi.npy: 0.08203125
+  hotel.npy: 0.19267578125
+  jungle_ruin.npy: 0.12238769531249999
+  medieval_house.npy: 0.1627197265625
+  modern_city_building.npy: 0.13623046875
+  modern_house.npy: 0.2519287109375
+  nether_portal.npy: 0.026074218750000003
+  ocean.npy: 0.1412841796875
+  redstone.npy: 0.0618896484375
+  server_spawn.npy: 0.11831054687500002
+  ship.npy: 0.048364257812500006
+  small_house.npy: 0.02939453125
+  terrain_0.npy: 0.0963623046875
+  terrain_1.npy: 0.1390380859375
+  terrain_2.npy: 0.09892578125
   village_in_a_tree.npy: 0.09099047619047618
 num_blocks:
   air.npy: 0.0
