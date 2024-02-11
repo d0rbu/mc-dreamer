@@ -150,7 +150,6 @@ class OptimizedHeuristics:
         sample: np.ndarray,
         sample_size: tuple[int, int, int] = (16, 16, 16),
     ) -> float:
-        import pdb; pdb.set_trace()
         # 16^3
         total_blocks = sample_size[0] * sample_size[1] * sample_size[2]
 
