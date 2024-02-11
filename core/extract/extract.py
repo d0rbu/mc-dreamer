@@ -8,6 +8,7 @@ from mpi4py import MPI
 from itertools import chain, product
 from more_itertools import chunked
 from typing import Sequence
+from core.heuristics.heuristics import OptimizedHeuristics
 
 
 CHUNK_LENGTH = 16  # in blocks
@@ -41,8 +42,10 @@ def extract_from_ndarray(
     dense_array: np.ndarray,
     sample_size: tuple[int, int, int],
     score_threshold: float = 0.5,
-) -> list[np.ndarray]:
+) -> tuple[list[np.ndarray], list[float]]:
+    vectorized_score_fn = np.vectorize(OptimizedHeuristics.best_heuristic)
     extracted_samples = []
+    scores = []
 
     scores = np.empty((dense_array.shape[0] - sample_size[0] + 1, dense_array.shape[1] - sample_size[1] + 1, dense_array.shape[2] - sample_size[2] + 1), dtype=np.float32)
     running_integral = np.zeros((sample_size[0] + 1, *dense_array.shape[1:], NUM_BLOCKS), dtype=np.uintc)
@@ -84,19 +87,20 @@ def extract_from_ndarray(
             running_integral[0, sample_size[1] - 1, sample_size[2] - 1]
 
         # idk do a dot product with weights and unique blocks or sumn
-        scores[x - sample_size[0] + 1] = plane_block_counts.mean(axis=-1)
+        scores[x - sample_size[0] + 1] = vectorized_score_fn(plane_block_counts)
 
     # now pick scores above a certain threshold and extract the samples
     for x, y, z in zip(*np.where(scores > score_threshold)):
         extracted_samples.append(dense_array[x:x + sample_size[0], y:y + sample_size[1], z:z + sample_size[2]])
+        scores.append(scores[x, y, z])
 
-    return extracted_samples
+    return extracted_samples, scores
 
 def extract_from_region(
     file_path: str | os.PathLike,
     sample_size: tuple[int, int, int],
     score_threshold: float = 0.5,
-) -> list[np.ndarray]:
+) -> tuple[list[np.ndarray], list[float]]:
     ndarray_filepath = file_path.replace(".mca", ".npy")
     if os.path.exists(ndarray_filepath):
         ndarray_blocks = np.load(ndarray_filepath)
@@ -195,24 +199,41 @@ def get_corner_samples(
 
     return sliced_corner_region
 
+SAMPLES_PER_FILE = 8192
+
 def save_samples(
     samples: list[np.ndarray],
+    scores: list[float],
     output_dir: str | os.PathLike,
-) -> list[np.ndarray]:
-    while len(samples) >= SAMPLES_PER_FILE:
-        sample_tensor = th.tensor(samples[:SAMPLES_PER_FILE], dtype=th.uint8)
-        th.save(sample_tensor, os.path.join(output_dir, str(uuid4()) + ".pt"))
-        samples = samples[SAMPLES_PER_FILE:]
+    min_size: int = SAMPLES_PER_FILE,
+) -> tuple[list[np.ndarray], list[np.ndarray]]:
+    if min_size > 0:
+        while len(samples) >= min_size:
+            sample_tensor = th.tensor(samples[:SAMPLES_PER_FILE], dtype=th.uint8)
+            exported_samples = {
+                "samples": sample_tensor,
+                "scores": scores[:SAMPLES_PER_FILE],
+            }
+            th.save(exported_samples, os.path.join(output_dir, str(uuid4()) + ".pt"))
+            samples = samples[min_size:]
+            scores = scores[min_size:]
+    else:
+        sample_tensor = th.tensor(samples, dtype=th.uint8)
+        exported_samples = {
+            "samples": sample_tensor,
+            "scores": scores,
+        }
+        th.save(exported_samples, os.path.join(output_dir, str(uuid4()) + ".pt"))
+        samples = []
+        scores = []
 
-    return samples
+    return samples, scores
 
 _print = print
 # only print from rank 0
 def print(*args, **kwargs):
     if COMM.Get_rank() == 0:
         _print(*args, **kwargs)
-
-SAMPLES_PER_FILE = 2048
 
 def extract_world(
     path: str | os.PathLike,
@@ -228,6 +249,8 @@ def extract_world(
     region_dir = os.path.join(path, "region")
     available_regions, region_indices = get_available_regions(region_dir)
     extracted_samples = []
+    scores = []
+
     rank = COMM.Get_rank()
     world_size = COMM.Get_size()
     os.makedirs(output_dir, exist_ok=True)
@@ -237,9 +260,11 @@ def extract_world(
     for region_index_chunk in chunked(region_indices, world_size):
         x, z = region_index_chunk[rank]
         file_path = os.path.join(region_dir, f"r.{x}.{z}.mca")
-        extracted_samples.extend(extract_from_region(file_path, sample_size, score_threshold))
+        region_samples, region_scores = extract_from_region(file_path, sample_size, score_threshold)
+        extracted_samples.extend(region_samples)
+        scores.extend(region_scores)
 
-        extracted_samples = save_samples(extracted_samples, output_dir)
+        extracted_samples, scores = save_samples(extracted_samples, scores, output_dir)
 
     vertical_edge_region_samples = available_regions[:-1] & available_regions[1:]
     horizontal_edge_region_samples = available_regions[:, :-1] & available_regions[:, 1:]
@@ -289,9 +314,14 @@ def extract_world(
     print("Filtering extracted edge and corner samples...")
 
     for unprocessed_sample in unprocessed_samples:
-        extracted_samples.extend(extract_from_ndarray(unprocessed_sample, sample_size, score_threshold))
+        region_samples, region_scores = extract_from_ndarray(unprocessed_sample, sample_size, score_threshold)
+        extracted_samples.extend(region_samples)
+        scores.extend(region_scores)
 
-        extracted_samples = save_samples(extracted_samples, output_dir)
+        extracted_samples, scores = save_samples(extracted_samples, scores, output_dir)
+
+    # save any remaining samples
+    save_samples(extracted_samples, scores, output_dir, min_size=0)
 
     print("Done")
 

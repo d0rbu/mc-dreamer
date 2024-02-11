@@ -29,16 +29,14 @@ def test_heuristics(
     normalized_ref_scores = normalize_scores(ref_scores)
     avg_ref_scores = average_ref_scores(normalized_ref_scores)
 
-    HEURISTIC_WEIGHT_STEPS = (
-        ("num_blocks", 10),
-        ("block_weighted", 10),
-        ("num_unique_blocks", 10),
-        ("intresing_decency", 10),
-        ("fewer_blocks", 10),
+    HEURISTIC_WEIGHT_VALUES = (
+        ("interesting", np.linspace(0.1, 0.22, 10)),
+        ("interesting_solid_ratio", np.linspace(0.26, 0.39, 10)),
+        ("fewer_blocks", np.linspace(0.45, 0.55, 10)),
     )
 
-    heuristic_names = [name for name, _ in HEURISTIC_WEIGHT_STEPS]
-    heuristic_steps = [np.linspace(0, 1, steps) for _, steps in HEURISTIC_WEIGHT_STEPS]
+    heuristic_names = [name for name, _ in HEURISTIC_WEIGHT_VALUES]
+    heuristic_steps = [steps for _, steps in HEURISTIC_WEIGHT_VALUES]
 
     samples = {}
     for file in files:
@@ -53,14 +51,15 @@ def test_heuristics(
         heuristic_name: None for heuristic_name in heuristic_names
     }
     total_steps = 1
-    for name, steps in HEURISTIC_WEIGHT_STEPS:
-        total_steps *= steps
+    for name, steps in HEURISTIC_WEIGHT_VALUES:
+        total_steps *= int(steps.shape[0])
 
     heuristic_weight_candidates = product(*heuristic_steps)
     consume(heuristic_weight_candidates, 1)
     for heuristic_weights in tqdm(heuristic_weight_candidates, total=total_steps):
+        weight_sum = sum(heuristic_weights)
         weights = {
-            name: weight for name, weight in zip(heuristic_names, heuristic_weights)
+            name: weight / weight_sum for name, weight in zip(heuristic_names, heuristic_weights)
         }
         scores = {
             file: Heuristics.mix(sample, weights)
@@ -69,12 +68,10 @@ def test_heuristics(
         normalized_scores = normalize_score(scores)
 
         loss = score_binary_cross_entropy(avg_ref_scores, normalized_scores)
-        
+
         if min_loss > loss:
             min_loss = loss
-            min_weights = {
-                heuristic_name: heuristic_weight for heuristic_name, heuristic_weight in zip(heuristic_names, heuristic_weights)
-            }
+            min_weights = weights
             print(f"new min: {min_loss}\nweights: {min_weights}")
 
     print(min_weights)
