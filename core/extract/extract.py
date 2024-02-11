@@ -59,14 +59,17 @@ def extract_from_ndarray(
     sample_size: tuple[int, int, int],
     score_threshold: float = 0.5,
 ) -> tuple[list[np.ndarray], list[float]]:
-    vectorized_score_fn = np.vectorize(OptimizedHeuristics.best_heuristic, cache=True, signature="(n)->()")
     extracted_samples = []
     scores = []
 
     scores = np.empty((dense_array.shape[0] - sample_size[0] + 1, dense_array.shape[1] - sample_size[1] + 1, dense_array.shape[2] - sample_size[2] + 1), dtype=np.float32)
     running_integral = np.zeros((sample_size[0] + 1, *dense_array.shape[1:], NUM_BLOCKS), dtype=np.uintc)
 
-    for x in tqdm(range(dense_array.shape[0]), total=dense_array.shape[0], leave=False, desc="Scoring samples"):
+    x_generator = range(dense_array.shape[0])
+    if COMM.Get_rank() == 0:
+        x_generator = tqdm(x_generator, total=dense_array.shape[0], desc="Scoring samples")
+
+    for x in x_generator:
         running_integral = np.roll(running_integral, shift=-1, axis=0)
         sparse_plane = np.zeros((*dense_array.shape[1:], NUM_BLOCKS), dtype=np.uintc)
         np.put_along_axis(sparse_plane, np.expand_dims(dense_array[x], axis=-1), 1, axis=-1)
@@ -104,7 +107,7 @@ def extract_from_ndarray(
         
         assert (plane_block_counts.sum(axis=-1) == sample_size[0] * sample_size[1] * sample_size[2]).all()
 
-        scores[x - sample_size[0] + 1] = vectorized_score_fn(plane_block_counts)
+        scores[x - sample_size[0] + 1] = OptimizedHeuristics.best_heuristic(plane_block_counts, sample_size)
 
     # now pick scores above a certain threshold and extract the samples
     for x, y, z in tqdm(zip(*np.where(scores > score_threshold)), total=scores.size, leave=False, desc="Extracting samples"):

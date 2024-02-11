@@ -1,10 +1,9 @@
 import os
-import yaml
 import numpy as np
 from itertools import product
 from more_itertools import consume
 from tqdm import tqdm
-from core.heuristics.heuristics import HEURISTICS, Heuristics
+from core.heuristics.heuristics import Heuristics
 from core.heuristics.ref_scores import (
     normalize_scores,
     normalize_score,
@@ -12,7 +11,6 @@ from core.heuristics.ref_scores import (
     get_ref_scores,
     score_binary_cross_entropy,
 )
-from typing import Sequence
 
 SCORE_WIDTH = 6
 AVG_REF_SCORE_NAME = "avg"

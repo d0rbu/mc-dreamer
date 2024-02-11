@@ -1,7 +1,6 @@
 import os
 import yaml
 import numpy as np
-from tqdm import tqdm
 from itertools import product
 from typing import Sequence, Callable
 
@@ -102,6 +101,8 @@ class Heuristics:
 
 
 class OptimizedHeuristics:
+    interesting_weights = interesting_weights
+
     @staticmethod
     def num_solid_blocks(sample: np.ndarray) -> float:
         # sample is now a 256-dimensional vector containing block counts
@@ -118,7 +119,7 @@ class OptimizedHeuristics:
     @DisableForTesting
     @staticmethod
     def interesting_solid_ratio(sample: np.ndarray) -> float:
-        interesting_block_score = float(interesting_weights[sample].mean())
+        interesting_block_score = OptimizedHeuristics.interesting(sample)
         total_blocks = (sample > 0).sum()
 
         return interesting_block_score / total_blocks if total_blocks > 0 else 0
@@ -147,27 +148,36 @@ class OptimizedHeuristics:
 
     @staticmethod
     def best_heuristic(
-        sample: np.ndarray,
+        sample: np.ndarray,  # (*, 256) block count vector(s)
         sample_size: tuple[int, int, int] = (16, 16, 16),
-    ) -> float:
+    ) -> np.ndarray:
         # 16^3
         total_blocks = sample_size[0] * sample_size[1] * sample_size[2]
 
-        # Apply weights to chunk
-        interesting_score = interesting_weights.dot(sample) / total_blocks
+        original_shape = sample.shape
+        sample = sample.reshape(-1, 256)
+        interesting_score = sample @ OptimizedHeuristics.interesting_weights / total_blocks
 
-        solid_blocks_ratio = sample[1:].sum() / total_blocks
-        interesting_solid_ratio = interesting_score / solid_blocks_ratio if solid_blocks_ratio > 0 else 0
+        solid_blocks_ratio = sample[:, 1:].sum(axis=-1) / total_blocks
 
-        # def unique_block_ratio(sample: np.ndarray)
-        unique_block_ratio = (sample > 0).sum() / NUM_BLOCK_TYPES
+        air_mask = solid_blocks_ratio == 0
+        interesting_solid_ratio = np.empty_like(solid_blocks_ratio)
+        interesting_solid_ratio[air_mask] = 0
+        interesting_solid_ratio[~air_mask] = interesting_score[~air_mask] / solid_blocks_ratio[~air_mask]
 
-        fewer_blocks_score = min(1, unique_block_ratio / (14/256), 1 - (unique_block_ratio - 50/256))
+        unique_block_ratio = (sample > 0).sum(axis=-1) / NUM_BLOCK_TYPES
 
-        return \
-            interesting_score * 1/6 + \
-            interesting_solid_ratio * 1/3 + \
-            fewer_blocks_score * 1/2
+        lower_bound_unique_block_ratios = unique_block_ratio / (14/256)
+        upper_bound_unique_block_ratios = 1 - (unique_block_ratio - 50/256)
+        ones = np.ones_like(unique_block_ratio)
+        fewer_blocks_options = np.stack((ones, lower_bound_unique_block_ratios, upper_bound_unique_block_ratios), axis=-1)
+        fewer_blocks_score = fewer_blocks_options.min(axis=-1)
+
+        score = interesting_score * 1/6 + \
+                interesting_solid_ratio * 1/3 + \
+                fewer_blocks_score * 1/2
+        
+        return score.reshape(original_shape[:-1])
 
 
 HEURISTICS: Sequence[Heuristic] = [
