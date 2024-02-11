@@ -1,8 +1,10 @@
 import os
 import zipfile
+import json
 import anvil.anvil as anvil
 import numpy as np
 import torch as th
+from tqdm import tqdm
 from uuid import uuid4
 from mpi4py import MPI
 from itertools import chain, product
@@ -16,8 +18,18 @@ CHUNK_HEIGHT = 256  # in blocks
 REGION_LENGTH = 32  # in chunks
 REGION_BLOCK_LENGTH = REGION_LENGTH * CHUNK_LENGTH  # in blocks
 NUM_BLOCKS = 256
+BLOCK_MAP_PATH = "core/extract/block_map.json"
+
+with open(BLOCK_MAP_PATH, "r") as f:
+    BLOCK_MAP = json.load(f)
+    BLOCK_MAP = {
+        f"minecraft:{name}": id for name, id in BLOCK_MAP.items()
+    }
 
 COMM = MPI.COMM_WORLD
+
+def block_name_to_id(block_name: str) -> int:
+    return anvil.Block.from_name(block_name).id()
 
 def get_available_regions(region_dir: str | os.PathLike) -> tuple[np.ndarray, Sequence[tuple[int, int]]]:
     region_files = [file for file in os.listdir(region_dir) if file.endswith(".mca")]
@@ -108,13 +120,12 @@ def extract_from_region(
         with open(file_path, "rb") as region_file:
             region = anvil.Region.from_file(region_file)
 
-        # ndarray_blocks = np.empty((REGION_BLOCK_LENGTH, CHUNK_HEIGHT, REGION_BLOCK_LENGTH), dtype=np.uint16)
-        ndarray_blocks = np.empty((REGION_BLOCK_LENGTH, CHUNK_HEIGHT, REGION_BLOCK_LENGTH), dtype=object)
-        for chunk_x, chunk_z in product(range(REGION_LENGTH), repeat=2):
+        ndarray_blocks = np.empty((REGION_BLOCK_LENGTH, CHUNK_HEIGHT, REGION_BLOCK_LENGTH), dtype=np.ubyte)
+        for chunk_x, chunk_z in tqdm(product(range(REGION_LENGTH), repeat=2)):
             chunk = anvil.Chunk.from_region(region, chunk_x, chunk_z)
             for block_x, block_y, block_z in product(range(CHUNK_LENGTH), range(CHUNK_HEIGHT), range(CHUNK_LENGTH)):
                 x, y, z = chunk_x * CHUNK_LENGTH + block_x, block_y, chunk_z * CHUNK_LENGTH + block_z
-                ndarray_blocks[x, y, z] = chunk.get_block(block_x, block_y, block_z).name()
+                ndarray_blocks[x, y, z] = BLOCK_MAP[chunk.get_block(block_x, block_y, block_z).name()]
 
         np.save(ndarray_filepath, ndarray_blocks)
 
