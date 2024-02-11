@@ -149,9 +149,10 @@ class OptimizedHeuristics:
     def best_heuristic(
         sample: np.ndarray,
     ) -> float:
-        interesting_score = float(interesting_weights[sample].mean())
+        # Apply weights to chunk
+        interesting_score = interesting_weights.dot(sample) / NUM_BLOCKS
 
-        total_blocks = (sample > 0).sum()
+        total_blocks = sample[1:].sum()
         interesting_solid_ratio = interesting_score / total_blocks if total_blocks > 0 else 0
 
         unique_block_ratio = total_blocks / NUM_BLOCKS

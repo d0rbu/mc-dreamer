@@ -25,6 +25,10 @@ with open(BLOCK_MAP_PATH, "r") as f:
     BLOCK_MAP = {
         f"minecraft:{name}": id for name, id in BLOCK_MAP.items()
     }
+    underscore_block_map = {
+        name.replace(" ", "_"): id for name, id in BLOCK_MAP.items()
+    }
+    BLOCK_MAP.update(underscore_block_map)
 
 COMM = MPI.COMM_WORLD
 
@@ -55,15 +59,15 @@ def extract_from_ndarray(
     sample_size: tuple[int, int, int],
     score_threshold: float = 0.5,
 ) -> tuple[list[np.ndarray], list[float]]:
-    vectorized_score_fn = np.vectorize(OptimizedHeuristics.best_heuristic)
+    vectorized_score_fn = np.vectorize(OptimizedHeuristics.best_heuristic, cache=True, signature="(n)->()")
     extracted_samples = []
     scores = []
 
     scores = np.empty((dense_array.shape[0] - sample_size[0] + 1, dense_array.shape[1] - sample_size[1] + 1, dense_array.shape[2] - sample_size[2] + 1), dtype=np.float32)
     running_integral = np.zeros((sample_size[0] + 1, *dense_array.shape[1:], NUM_BLOCKS), dtype=np.uintc)
 
-    for x in range(dense_array.shape[0]):
-        np.roll(running_integral, shift=-1, axis=0)
+    for x in tqdm(range(dense_array.shape[0]), total=dense_array.shape[0], leave=False, desc="Scoring samples"):
+        running_integral = np.roll(running_integral, shift=-1, axis=0)
         sparse_plane = np.zeros((*dense_array.shape[1:], NUM_BLOCKS), dtype=np.uintc)
         np.put_along_axis(sparse_plane, np.expand_dims(dense_array[x], axis=-1), 1, axis=-1)
 
@@ -97,12 +101,13 @@ def extract_from_ndarray(
         plane_block_counts[0, 0] = \
             running_integral[-1, sample_size[1] - 1, sample_size[2] - 1] - \
             running_integral[0, sample_size[1] - 1, sample_size[2] - 1]
+        
+        assert (plane_block_counts.sum(axis=-1) == sample_size[0] * sample_size[1] * sample_size[2]).all()
 
-        # idk do a dot product with weights and unique blocks or sumn
         scores[x - sample_size[0] + 1] = vectorized_score_fn(plane_block_counts)
 
     # now pick scores above a certain threshold and extract the samples
-    for x, y, z in zip(*np.where(scores > score_threshold)):
+    for x, y, z in tqdm(zip(*np.where(scores > score_threshold)), total=scores.size, leave=False, desc="Extracting samples"):
         extracted_samples.append(dense_array[x:x + sample_size[0], y:y + sample_size[1], z:z + sample_size[2]])
         scores.append(scores[x, y, z])
 
@@ -121,11 +126,12 @@ def extract_from_region(
             region = anvil.Region.from_file(region_file)
 
         ndarray_blocks = np.empty((REGION_BLOCK_LENGTH, CHUNK_HEIGHT, REGION_BLOCK_LENGTH), dtype=np.ubyte)
-        for chunk_x, chunk_z in tqdm(product(range(REGION_LENGTH), repeat=2)):
+        for chunk_x, chunk_z in tqdm(product(range(REGION_LENGTH), repeat=2), total=REGION_LENGTH ** 2, leave=False, desc="Converting region to ndarray"):
             chunk = anvil.Chunk.from_region(region, chunk_x, chunk_z)
             for block_x, block_y, block_z in product(range(CHUNK_LENGTH), range(CHUNK_HEIGHT), range(CHUNK_LENGTH)):
                 x, y, z = chunk_x * CHUNK_LENGTH + block_x, block_y, chunk_z * CHUNK_LENGTH + block_z
-                ndarray_blocks[x, y, z] = BLOCK_MAP[chunk.get_block(block_x, block_y, block_z).name()]
+                block_name = chunk.get_block(block_x, block_y, block_z).name()
+                ndarray_blocks[x, y, z] = BLOCK_MAP[block_name]
 
         np.save(ndarray_filepath, ndarray_blocks)
 
@@ -266,9 +272,7 @@ def extract_world(
     world_size = COMM.Get_size()
     os.makedirs(output_dir, exist_ok=True)
 
-    print("Extracting samples from regions...")
-
-    for region_index_chunk in chunked(region_indices, world_size):
+    for region_index_chunk in tqdm(chunked(region_indices, world_size), total=available_regions.sum() // world_size, desc="Extracting samples from regions"):
         x, z = region_index_chunk[rank]
         file_path = os.path.join(region_dir, f"r.{x}.{z}.mca")
         region_samples, region_scores = extract_from_region(file_path, sample_size, score_threshold)
@@ -324,7 +328,7 @@ def extract_world(
 
     print("Filtering extracted edge and corner samples...")
 
-    for unprocessed_sample in unprocessed_samples:
+    for unprocessed_sample in tqdm(unprocessed_samples.values(), total=len(unprocessed_samples), desc="Filtering extracted edge and corner samples"):
         region_samples, region_scores = extract_from_ndarray(unprocessed_sample, sample_size, score_threshold)
         extracted_samples.extend(region_samples)
         scores.extend(region_scores)
