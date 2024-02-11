@@ -7,7 +7,7 @@ from typing import Sequence, Callable
 
 
 Heuristic = Callable[[np.ndarray], float]
-NUM_BLOCKS = 256
+NUM_BLOCK_TYPES = 256
 
 
 _disabled_heuristics: set[Heuristic] = set()
@@ -29,7 +29,7 @@ with open(CRAZY_WEIGHTS_PATHS) as f:
 
 class Heuristics:
     @staticmethod
-    def num_blocks(sample: np.ndarray) -> float:
+    def num_solid_blocks(sample: np.ndarray) -> float:
         return float(np.mean(sample > 0))
 
     @staticmethod
@@ -38,16 +38,16 @@ class Heuristics:
 
     @staticmethod
     def unique_block_ratio(sample: np.ndarray) -> float:
-        return len(np.unique(sample)) / NUM_BLOCKS
+        return len(np.unique(sample)) / NUM_BLOCK_TYPES
 
     @staticmethod
     def heuristic_1(
         sample: np.ndarray,
-        num_blocks_weight: float = 1.0,
+        num_solid_weight: float = 1.0,
         interesting_weight: float = 4.0,
         unique_block_ratio_weight: float = 10.0,
     ) -> float:
-        return Heuristics.num_blocks(sample) * num_blocks_weight + \
+        return Heuristics.num_solid_blocks(sample) * num_solid_weight + \
                Heuristics.interesting(sample) * interesting_weight + \
                Heuristics.unique_block_ratio(sample) * unique_block_ratio_weight
 
@@ -55,9 +55,9 @@ class Heuristics:
     def interesting_solid_ratio(
         sample: np.ndarray,
     ) -> float:
-        interesting_block_score = float(interesting_weights[sample].mean())
+        interesting_block_score = Heuristics.interesting(sample)
 
-        total_blocks = Heuristics.num_blocks(sample)
+        total_blocks = Heuristics.num_solid_blocks(sample)
 
         return interesting_block_score / total_blocks if total_blocks > 0 else 0
 
@@ -103,17 +103,17 @@ class Heuristics:
 
 class OptimizedHeuristics:
     @staticmethod
-    def num_blocks(sample: np.ndarray) -> float:
+    def num_solid_blocks(sample: np.ndarray) -> float:
         # sample is now a 256-dimensional vector containing block counts
-        return float(sample[1].sum())
+        return float(sample[1].sum()) / 4096
 
     @staticmethod
     def interesting(sample: np.ndarray) -> float:
-        return float(interesting_weights[sample].mean())
+        return float(interesting_weights.dot(sample)) / 4096
 
     @staticmethod
     def unique_block_ratio(sample: np.ndarray) -> float:
-        return (sample > 0).sum() / NUM_BLOCKS
+        return (sample > 0).sum() / NUM_BLOCK_TYPES
 
     @DisableForTesting
     @staticmethod
@@ -148,14 +148,20 @@ class OptimizedHeuristics:
     @staticmethod
     def best_heuristic(
         sample: np.ndarray,
+        sample_size: tuple[int, int, int] = (16, 16, 16),
     ) -> float:
+        import pdb; pdb.set_trace()
+        # 16^3
+        total_blocks = sample_size[0] * sample_size[1] * sample_size[2]
+
         # Apply weights to chunk
-        interesting_score = interesting_weights.dot(sample) / NUM_BLOCKS
+        interesting_score = interesting_weights.dot(sample) / total_blocks
 
-        total_blocks = sample[1:].sum()
-        interesting_solid_ratio = interesting_score / total_blocks if total_blocks > 0 else 0
+        solid_blocks_ratio = sample[1:].sum() / total_blocks
+        interesting_solid_ratio = interesting_score / solid_blocks_ratio if solid_blocks_ratio > 0 else 0
 
-        unique_block_ratio = total_blocks / NUM_BLOCKS
+        # def unique_block_ratio(sample: np.ndarray)
+        unique_block_ratio = (sample > 0).sum() / NUM_BLOCK_TYPES
 
         fewer_blocks_score = min(1, unique_block_ratio / (14/256), 1 - (unique_block_ratio - 50/256))
 
