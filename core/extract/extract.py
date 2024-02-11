@@ -1,6 +1,7 @@
 import os
 import zipfile
 import json
+import pickle
 import anvil.anvil as anvil
 import numpy as np
 import torch as th
@@ -60,14 +61,14 @@ def extract_from_ndarray(
     score_threshold: float = 0.5,
 ) -> tuple[list[np.ndarray], list[float]]:
     extracted_samples = []
-    scores = []
+    output_scores = []
 
     scores = np.empty((dense_array.shape[0] - sample_size[0] + 1, dense_array.shape[1] - sample_size[1] + 1, dense_array.shape[2] - sample_size[2] + 1), dtype=np.float32)
     running_integral = np.zeros((sample_size[0] + 1, *dense_array.shape[1:], NUM_BLOCKS), dtype=np.uintc)
 
     x_generator = range(dense_array.shape[0])
     if COMM.Get_rank() == 0:
-        x_generator = tqdm(x_generator, total=dense_array.shape[0], desc="Scoring samples")
+        x_generator = tqdm(x_generator, total=dense_array.shape[0], leave=False, desc="Scoring samples")
 
     for x in x_generator:
         running_integral = np.roll(running_integral, shift=-1, axis=0)
@@ -112,9 +113,9 @@ def extract_from_ndarray(
     # now pick scores above a certain threshold and extract the samples
     for x, y, z in tqdm(zip(*np.where(scores > score_threshold)), total=scores.size, leave=False, desc="Extracting samples"):
         extracted_samples.append(dense_array[x:x + sample_size[0], y:y + sample_size[1], z:z + sample_size[2]])
-        scores.append(scores[x, y, z])
+        output_scores.append(float(scores[x, y, z]))
 
-    return extracted_samples, scores
+    return extracted_samples, output_scores
 
 def extract_from_region(
     file_path: str | os.PathLike,
@@ -229,12 +230,14 @@ def save_samples(
 ) -> tuple[list[np.ndarray], list[np.ndarray]]:
     if min_size > 0:
         while len(samples) >= min_size:
-            sample_tensor = th.tensor(samples[:SAMPLES_PER_FILE], dtype=th.uint8)
-            exported_samples = {
-                "samples": sample_tensor,
-                "scores": scores[:SAMPLES_PER_FILE],
-            }
-            th.save(exported_samples, os.path.join(output_dir, str(uuid4()) + ".pt"))
+            sample_ndarray = np.stack(samples[:min_size], axis=0)
+            sample_tensor = th.tensor(sample_ndarray, dtype=th.uint8)
+
+            sample_uuid = str(uuid4())
+            th.save(sample_tensor, os.path.join(output_dir, f"{sample_uuid}.pt"))
+            with open(os.path.join(output_dir, f"{sample_uuid}.scores"), "wb") as f:
+                pickle.dump(scores[:min_size], f)
+
             samples = samples[min_size:]
             scores = scores[min_size:]
     else:
@@ -275,7 +278,7 @@ def extract_world(
     world_size = COMM.Get_size()
     os.makedirs(output_dir, exist_ok=True)
 
-    for region_index_chunk in tqdm(chunked(region_indices, world_size), total=available_regions.sum() // world_size, desc="Extracting samples from regions"):
+    for region_index_chunk in tqdm(chunked(region_indices, world_size), total=available_regions.sum() // world_size, leave=False, desc="Extracting samples from regions"):
         x, z = region_index_chunk[rank]
         file_path = os.path.join(region_dir, f"r.{x}.{z}.mca")
         region_samples, region_scores = extract_from_region(file_path, sample_size, score_threshold)
@@ -331,7 +334,7 @@ def extract_world(
 
     print("Filtering extracted edge and corner samples...")
 
-    for unprocessed_sample in tqdm(unprocessed_samples.values(), total=len(unprocessed_samples), desc="Filtering extracted edge and corner samples"):
+    for unprocessed_sample in tqdm(unprocessed_samples.values(), total=len(unprocessed_samples), leave=False, desc="Filtering extracted edge and corner samples"):
         region_samples, region_scores = extract_from_ndarray(unprocessed_sample, sample_size, score_threshold)
         extracted_samples.extend(region_samples)
         scores.extend(region_scores)
@@ -340,8 +343,6 @@ def extract_world(
 
     # save any remaining samples
     save_samples(extracted_samples, scores, output_dir, min_size=0)
-
-    print("Done")
 
 def extract_zipped_world(
     path: str | os.PathLike,

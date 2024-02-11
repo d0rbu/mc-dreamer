@@ -118,6 +118,30 @@ interesting_unique_balance:
   terrain_1.npy: 0.03515625
   terrain_2.npy: 0.04296875
   village_in_a_tree.npy: 0.0546875
+mix:
+  air.npy: 0.03571428571428571
+  colosseum.npy: 0.4451530141405778
+  desert_arch.npy: 0.393957278413682
+  flat.npy: 0.251140873015873
+  freezer_truck.npy: 0.5885416666666666
+  golf_clubhouse.npy: 0.8039136735479122
+  grand_hotel.npy: 0.6097292050853934
+  hi.npy: 0.46781994047619047
+  hotel.npy: 0.8222499334446947
+  jungle_ruin.npy: 0.5336738867281078
+  medieval_house.npy: 0.8298759238612905
+  modern_city_building.npy: 0.5890718505217463
+  modern_house.npy: 0.7277714006921988
+  nether_portal.npy: 0.4097897089487801
+  ocean.npy: 0.14207066127232143
+  redstone.npy: 0.7468203590029762
+  server_spawn.npy: 0.6136539144449301
+  ship.npy: 0.5074697236768738
+  small_house.npy: 0.5440420539373536
+  terrain_0.npy: 0.4026532282854364
+  terrain_1.npy: 0.40985883337380963
+  terrain_2.npy: 0.47704066974382486
+  village_in_a_tree.npy: 0.6910480189732143
 num_solid_blocks:
   air.npy: 0.0
   colosseum.npy: 0.173095703125

@@ -82,11 +82,14 @@ class Heuristics:
 
         return 1
 
-    @DisableForTesting
     @staticmethod
     def mix(
         sample: np.ndarray,
-        heuristic_weights: dict[str, float]
+        heuristic_weights: dict[str, float] = {
+            "interesting": 1/6,
+            "interesting_solid_ratio": 1/3,
+            "fewer_blocks": 1/2,
+        }
     ) -> float:
         # allows for dynamic mixing of heuristics
         heuristics = {
