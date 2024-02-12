@@ -220,37 +220,30 @@ def get_corner_samples(
 
     return sliced_corner_region
 
-SAMPLES_PER_FILE = 8192
-
 def save_samples(
     samples: list[np.ndarray],
     scores: list[float],
     output_dir: str | os.PathLike,
-    min_size: int = SAMPLES_PER_FILE,
-) -> tuple[list[np.ndarray], list[np.ndarray]]:
-    if min_size > 0:
-        while len(samples) >= min_size:
-            sample_ndarray = np.stack(samples[:min_size], axis=0)
-            sample_tensor = th.tensor(sample_ndarray, dtype=th.uint8)
+    source_identifier: str | None = None,
+    samples_per_file: int = 8192,
+    keep_last: bool = True,  # whether to keep the last remainder samples
+) -> None:
+    if source_identifier is not None:
+        output_dir = os.path.join(output_dir, source_identifier)
 
-            sample_uuid = str(uuid4())
-            th.save(sample_tensor, os.path.join(output_dir, f"{sample_uuid}.pt"))
-            with open(os.path.join(output_dir, f"{sample_uuid}.scores"), "wb") as f:
-                pickle.dump(scores[:min_size], f)
+    os.makedirs(output_dir, exist_ok=True)
+    while len(samples) >= samples_per_file or (keep_last and len(samples) > 0):
+        sample_ndarray = np.stack(samples[:samples_per_file], axis=0)
+        sample_tensor = th.tensor(sample_ndarray, dtype=th.uint8)
 
-            samples = samples[min_size:]
-            scores = scores[min_size:]
-    else:
-        sample_tensor = th.tensor(samples, dtype=th.uint8)
-        exported_samples = {
-            "samples": sample_tensor,
-            "scores": scores,
-        }
-        th.save(exported_samples, os.path.join(output_dir, str(uuid4()) + ".pt"))
-        samples = []
-        scores = []
+        sample_uuid = str(uuid4())
+        th.save(sample_tensor, os.path.join(output_dir, f"{sample_uuid}.pt"))
+        with open(os.path.join(output_dir, f"{sample_uuid}.scores"), "wb") as f:
+            pickle.dump(scores[:samples_per_file], f)
 
-    return samples, scores
+        if len(samples) > samples_per_file:
+            samples = samples[samples_per_file:]
+            scores = scores[samples_per_file:]
 
 _print = print
 # only print from rank 0
@@ -271,8 +264,6 @@ def extract_world(
     output_dir = os.path.join(output_dir, os.path.basename(path))
     region_dir = os.path.join(path, "region")
     available_regions, region_indices = get_available_regions(region_dir)
-    extracted_samples = []
-    scores = []
 
     rank = COMM.Get_rank()
     world_size = COMM.Get_size()
@@ -280,12 +271,13 @@ def extract_world(
 
     for region_index_chunk in tqdm(chunked(region_indices, world_size), total=available_regions.sum() // world_size, leave=False, desc="Extracting samples from regions"):
         x, z = region_index_chunk[rank]
-        file_path = os.path.join(region_dir, f"r.{x}.{z}.mca")
-        region_samples, region_scores = extract_from_region(file_path, sample_size, score_threshold)
-        extracted_samples.extend(region_samples)
-        scores.extend(region_scores)
+        region_name = f"r.{x}.{z}"
+        if os.path.exists(os.path.join(output_dir, region_name)):  # skip already processed regions
+            continue
 
-        extracted_samples, scores = save_samples(extracted_samples, scores, output_dir)
+        file_path = os.path.join(region_dir, f"{region_name}.mca")
+        samples, scores = extract_from_region(file_path, sample_size, score_threshold)
+        save_samples(samples, scores, output_dir, region_name)
 
     vertical_edge_region_samples = available_regions[:-1] & available_regions[1:]
     horizontal_edge_region_samples = available_regions[:, :-1] & available_regions[:, 1:]
@@ -334,15 +326,14 @@ def extract_world(
 
     print("Filtering extracted edge and corner samples...")
 
-    for unprocessed_sample in tqdm(unprocessed_samples.values(), total=len(unprocessed_samples), leave=False, desc="Filtering extracted edge and corner samples"):
-        region_samples, region_scores = extract_from_ndarray(unprocessed_sample, sample_size, score_threshold)
-        extracted_samples.extend(region_samples)
-        scores.extend(region_scores)
+    for unprocessed_file_path, unprocessed_sample in tqdm(unprocessed_samples, total=len(unprocessed_samples), leave=False, desc="Filtering extracted edge and corner samples"):
+        unprocessed_region_name = os.path.basename(unprocessed_file_path).replace(".npy", "")
+        if os.path.exists(os.path.join(output_dir, unprocessed_region_name)):  # skip already processed sections
+            continue
 
-        extracted_samples, scores = save_samples(extracted_samples, scores, output_dir)
+        samples, scores = extract_from_ndarray(unprocessed_sample, sample_size, score_threshold)
 
-    # save any remaining samples
-    save_samples(extracted_samples, scores, output_dir, min_size=0)
+        save_samples(samples, scores, output_dir, unprocessed_region_name)
 
 def extract_zipped_world(
     path: str | os.PathLike,

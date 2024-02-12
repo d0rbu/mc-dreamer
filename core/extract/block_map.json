@@ -822,6 +822,7 @@
     "peony": 175,
     "top half of any large plant; low three bits 0x7 are derived from the block below.": 175,
     "flower": 175,
+    "banner": 176,
     "standing banner": 176,
     "wall-mounted banner": 176,
     "black banner": 176,
