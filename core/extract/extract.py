@@ -131,7 +131,10 @@ def extract_from_region(
 
         ndarray_blocks = np.empty((REGION_BLOCK_LENGTH, CHUNK_HEIGHT, REGION_BLOCK_LENGTH), dtype=np.ubyte)
         for chunk_x, chunk_z in tqdm(product(range(REGION_LENGTH), repeat=2), total=REGION_LENGTH ** 2, leave=False, desc="Converting region to ndarray"):
-            chunk = anvil.Chunk.from_region(region, chunk_x, chunk_z)
+            try:
+                chunk = anvil.Chunk.from_region(region, chunk_x, chunk_z)
+            except anvil.errors.ChunkNotFound as e:
+                chunk = anvil.EmptyChunk(chunk_x, chunk_z)
             for block_x, block_y, block_z in product(range(CHUNK_LENGTH), range(CHUNK_HEIGHT), range(CHUNK_LENGTH)):
                 x, y, z = chunk_x * CHUNK_LENGTH + block_x, block_y, chunk_z * CHUNK_LENGTH + block_z
                 block_name = chunk.get_block(block_x, block_y, block_z).name()
