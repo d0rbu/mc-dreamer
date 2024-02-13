@@ -2,7 +2,7 @@ import os
 import zipfile
 import json
 import pickle
-import anvil.anvil as anvil
+import anvil
 import numpy as np
 import torch as th
 from tqdm import tqdm
