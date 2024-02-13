@@ -130,7 +130,7 @@ def extract_from_region(
             region = anvil.Region.from_file(region_file)
 
         ndarray_blocks = np.empty((REGION_BLOCK_LENGTH, CHUNK_HEIGHT, REGION_BLOCK_LENGTH), dtype=np.ubyte)
-        for chunk_x, chunk_z in tqdm(product(range(REGION_LENGTH), repeat=2), total=REGION_LENGTH ** 2, leave=False, desc="Converting region to ndarray"):
+        for chunk_x, chunk_z in tqdm(product(range(REGION_LENGTH), repeat=2), total=REGION_LENGTH ** 2, leave=False, desc=f"Converting region {os.path.basename(file_path)} to ndarray"):
             try:
                 chunk = anvil.Chunk.from_region(region, chunk_x, chunk_z)
             except anvil.errors.ChunkNotFound as e:
