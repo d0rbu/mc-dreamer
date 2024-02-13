@@ -294,7 +294,7 @@ def extract_world(
 
     unprocessed_samples = {}
     for sample_index_chunk in chunked(np.nonzero(vertical_edge_region_samples), world_size):
-        if len(region_index_chunk) <= rank:  # no more work left for us this iteration!
+        if len(sample_index_chunk) <= rank:  # no more work left for us this iteration!
             break
 
         x, z = sample_index_chunk[rank]
@@ -309,7 +309,7 @@ def extract_world(
             unprocessed_samples[new_file_path] = get_edge_samples(file_paths, axis=0)
 
     for sample_index_chunk in chunked(np.nonzero(horizontal_edge_region_samples), world_size):
-        if len(region_index_chunk) <= rank:  # no more work left for us this iteration!
+        if len(sample_index_chunk) <= rank:  # no more work left for us this iteration!
             break
 
         x, z = sample_index_chunk[rank]
@@ -324,7 +324,7 @@ def extract_world(
             unprocessed_samples[new_file_path] = get_edge_samples(file_paths, axis=2)
 
     for sample_index_chunk in chunked(np.nonzero(corner_region_samples), world_size):
-        if len(region_index_chunk) <= rank:  # no more work left for us this iteration!
+        if len(sample_index_chunk) <= rank:  # no more work left for us this iteration!
             break
 
         x, z = sample_index_chunk[rank]
