@@ -142,7 +142,8 @@ def extract_from_region(
 
         np.save(ndarray_filepath, ndarray_blocks)
 
-    return extract_from_ndarray(ndarray_blocks, sample_size, score_threshold)
+    return [], []
+    # return extract_from_ndarray(ndarray_blocks, sample_size, score_threshold)
 
 def get_edge_samples(
     file_paths: tuple[str | os.PathLike, str | os.PathLike],
@@ -273,6 +274,9 @@ def extract_world(
     os.makedirs(output_dir, exist_ok=True)
 
     for region_index_chunk in tqdm(chunked(region_indices, world_size), total=available_regions.sum() // world_size, leave=False, desc="Extracting samples from regions"):
+        if len(region_index_chunk) <= rank:  # no more work left for us this iteration!
+            break
+
         x, z = region_index_chunk[rank]
         region_name = f"r.{x}.{z}"
         if os.path.exists(os.path.join(output_dir, region_name)):  # skip already processed regions
@@ -290,6 +294,9 @@ def extract_world(
 
     unprocessed_samples = {}
     for sample_index_chunk in chunked(np.nonzero(vertical_edge_region_samples), world_size):
+        if len(region_index_chunk) <= rank:  # no more work left for us this iteration!
+            break
+
         x, z = sample_index_chunk[rank]
         file_paths = (
             os.path.join(region_dir, f"r.{x}.{z}.mca"),
@@ -302,6 +309,9 @@ def extract_world(
             unprocessed_samples[new_file_path] = get_edge_samples(file_paths, axis=0)
 
     for sample_index_chunk in chunked(np.nonzero(horizontal_edge_region_samples), world_size):
+        if len(region_index_chunk) <= rank:  # no more work left for us this iteration!
+            break
+
         x, z = sample_index_chunk[rank]
         file_paths = (
             os.path.join(region_dir, f"r.{x}.{z}.mca"),
@@ -314,6 +324,9 @@ def extract_world(
             unprocessed_samples[new_file_path] = get_edge_samples(file_paths, axis=2)
 
     for sample_index_chunk in chunked(np.nonzero(corner_region_samples), world_size):
+        if len(region_index_chunk) <= rank:  # no more work left for us this iteration!
+            break
+
         x, z = sample_index_chunk[rank]
         file_paths = (
             os.path.join(region_dir, f"r.{x}.{z}.mca"),
@@ -329,7 +342,7 @@ def extract_world(
 
     print("Filtering extracted edge and corner samples...")
 
-    for unprocessed_file_path, unprocessed_sample in tqdm(unprocessed_samples, total=len(unprocessed_samples), leave=False, desc="Filtering extracted edge and corner samples"):
+    for unprocessed_file_path, unprocessed_sample in tqdm(unprocessed_samples, total=len(unprocessed_samples), leave=False, desc="Extracting edge and corner samples"):
         unprocessed_region_name = os.path.basename(unprocessed_file_path).replace(".npy", "")
         if os.path.exists(os.path.join(output_dir, unprocessed_region_name)):  # skip already processed sections
             continue
