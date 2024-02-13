@@ -142,8 +142,7 @@ def extract_from_region(
 
         np.save(ndarray_filepath, ndarray_blocks)
 
-    return [], []
-    # return extract_from_ndarray(ndarray_blocks, sample_size, score_threshold)
+    return extract_from_ndarray(ndarray_blocks, sample_size, score_threshold)
 
 def get_edge_samples(
     file_paths: tuple[str | os.PathLike, str | os.PathLike],
@@ -156,15 +155,13 @@ def get_edge_samples(
     region_extracted_size = [REGION_BLOCK_LENGTH, CHUNK_HEIGHT, REGION_BLOCK_LENGTH]
     region_extracted_size[axis] = CHUNK_LENGTH - 1
     
-    first_ndarray_region = np.empty(*region_extracted_size, dtype=np.ubyte)
-    second_ndarray_region = np.empty(*region_extracted_size, dtype=np.ubyte)
+    first_ndarray_region = np.empty(region_extracted_size, dtype=np.ubyte)
+    second_ndarray_region = np.empty(region_extracted_size, dtype=np.ubyte)
 
     for block_x, block_y, block_z in product(*[range(-size, 0) for size in region_extracted_size]):
-        block_x, block_y, block_z = block_x % REGION_BLOCK_LENGTH, block_y % CHUNK_HEIGHT, block_z % REGION_BLOCK_LENGTH
         first_ndarray_region[block_x, block_y, block_z] = region_ndarrays[0][block_x, block_y, block_z]
     
     for block_x, block_y, block_z in product(*[range(size) for size in region_extracted_size]):
-        block_x, block_y, block_z = block_x % REGION_BLOCK_LENGTH, block_y % CHUNK_HEIGHT, block_z % REGION_BLOCK_LENGTH
         second_ndarray_region[block_x, block_y, block_z] = region_ndarrays[1][block_x, block_y, block_z]
     
     extracted_edge_region = np.concatenate((first_ndarray_region, second_ndarray_region), axis=axis)
@@ -180,25 +177,21 @@ def get_corner_samples(
     
     region_extracted_size = [CHUNK_LENGTH - 1, CHUNK_HEIGHT, CHUNK_LENGTH - 1]
 
-    first_ndarray_region = np.empty(*region_extracted_size, dtype=np.uint16)
-    second_ndarray_region = np.empty(*region_extracted_size, dtype=np.uint16)
-    third_ndarray_region = np.empty(*region_extracted_size, dtype=np.uint16)
-    fourth_ndarray_region = np.empty(*region_extracted_size, dtype=np.uint16)
+    first_ndarray_region = np.empty(region_extracted_size, dtype=np.uint16)
+    second_ndarray_region = np.empty(region_extracted_size, dtype=np.uint16)
+    third_ndarray_region = np.empty(region_extracted_size, dtype=np.uint16)
+    fourth_ndarray_region = np.empty(region_extracted_size, dtype=np.uint16)
 
     for block_x, block_y, block_z in product(*[range(-size, 0) for size in region_extracted_size]):
-        block_x, block_y, block_z = block_x % REGION_BLOCK_LENGTH, block_y % CHUNK_HEIGHT, block_z % REGION_BLOCK_LENGTH
         first_ndarray_region[block_x, block_y, block_z] = region_ndarrays[0][block_x, block_y, block_z]
     
     for block_x, block_y, block_z in product(range(region_extracted_size[0]), range(CHUNK_HEIGHT), range(-region_extracted_size[2], 0)):
-        block_x, block_y, block_z = block_x % REGION_BLOCK_LENGTH, block_y % CHUNK_HEIGHT, block_z % REGION_BLOCK_LENGTH
         second_ndarray_region[block_x, block_y, block_z] = region_ndarrays[1][block_x, block_y, block_z]
     
     for block_x, block_y, block_z in product(range(-region_extracted_size[0], 0), range(CHUNK_HEIGHT), range(region_extracted_size[2])):
-        block_x, block_y, block_z = block_x % REGION_BLOCK_LENGTH, block_y % CHUNK_HEIGHT, block_z % REGION_BLOCK_LENGTH
         third_ndarray_region[block_x, block_y, block_z] = region_ndarrays[2][block_x, block_y, block_z]
     
     for block_x, block_y, block_z in product(range(region_extracted_size[0]), range(CHUNK_HEIGHT), range(region_extracted_size[2])):
-        block_x, block_y, block_z = block_x % REGION_BLOCK_LENGTH, block_y % CHUNK_HEIGHT, block_z % REGION_BLOCK_LENGTH
         fourth_ndarray_region[block_x, block_y, block_z] = region_ndarrays[3][block_x, block_y, block_z]
     
     extracted_corner_region = np.concatenate((
@@ -329,7 +322,7 @@ def extract_world(
 
     print("Filtering extracted edge and corner samples...")
 
-    for unprocessed_file_path, unprocessed_sample in tqdm(unprocessed_samples, total=len(unprocessed_samples), leave=False, desc="Extracting edge and corner samples"):
+    for unprocessed_file_path, unprocessed_sample in tqdm(unprocessed_samples.items(), total=len(unprocessed_samples), leave=False, desc="Extracting edge and corner samples"):
         unprocessed_region_name = os.path.basename(unprocessed_file_path).replace(".npy", "")
         if os.path.exists(os.path.join(output_dir, unprocessed_region_name)):  # skip already processed sections
             continue
