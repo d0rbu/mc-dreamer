@@ -17,17 +17,17 @@ def get_percentile_scores(
             continue
 
         for file in files:
-            if not file.endswith(".scores"):
+            if not file.endswith(".pt"):
                 continue
-            
+
             file_path = os.path.join(root, file)
-            with open(file_path, "rb") as f:
-                scores = pickle.load(f)
-            
+            raw_data = th.load(file_path, map_location=th.device("cpu"))
+            scores = raw_data["scores"].flatten()
+
             for i, score in enumerate(scores):
                 full_scores.append((file_path, i, score))
 
-    full_scores = sorted(full_scores.items(), key=lambda x: x[1])
+    full_scores = sorted(full_scores, key=lambda x: x[1])
     num_samples = len(full_scores)
     percentiles = percentiles * num_samples
     percentiles[-1] = num_samples - 1
@@ -57,19 +57,18 @@ def get_percentile_scores_random(
             continue
 
         for file in tqdm(files, total=len(files), leave=False):
-            if not file.endswith(".scores"):
+            if not file.endswith(".pt"):
                 continue
-            
+
             file_path = os.path.join(root, file)
-            with open(file_path, "rb") as f:
-                scores = pickle.load(f)
-            
-            num_samples = len(scores)
-            selected_indices = np.random.choice(num_samples, min(samples_per_file, num_samples), replace=False)
-            
-            for i in selected_indices:
+            raw_data = th.load(file_path, map_location=th.device("cpu"))
+            scores = raw_data["scores"].flatten()
+
+            random_indices = np.random.choice(len(scores), min(samples_per_file, len(scores)), replace=False)
+
+            for i in random_indices:
                 full_scores.append((file_path, i, scores[i]))
-    
+
     full_scores = sorted(full_scores.items(), key=lambda x: x[1])
     num_samples = len(full_scores)
     percentiles = percentiles * num_samples
@@ -80,6 +79,8 @@ def get_percentile_scores_random(
     selected_scores = [full_scores[i] for i in percentiles]
 
     return selected_scores
+
+VOLUME_SIZE = (16, 16, 16)
 
 def convert_percentiles(
     percentiles: th.Tensor,
@@ -101,16 +102,15 @@ def convert_percentiles(
 
     loaded_samples = {}
 
-    for (scores_path, i), score in tqdm(selected_scores, desc="Gathering schematics"):
-        file_path = scores_path.replace(".scores", ".pt")
-
+    for file_path, i, score in tqdm(selected_scores, desc="Gathering schematics"):
         if file_path in loaded_samples:
             samples = loaded_samples[file_path]
         else:
-            samples = th.load(file_path)
+            samples = th.load(file_path)["region"]
             loaded_samples[file_path] = samples
-        
-        sample = samples[i]
+
+        x, y, z = np.unravel_index(i, samples.shape)
+        sample = samples[x:x+VOLUME_SIZE[0], y:y+VOLUME_SIZE[1], z:z+VOLUME_SIZE[2]]
         sf = SchematicFile(shape=sample.shape)
         sf.blocks = sample.numpy().astype(np.uint8).transpose(1, 2, 0)
 

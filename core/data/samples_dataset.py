@@ -8,12 +8,12 @@ from functools import cache
 
 
 class FileMetadata(BaseModel):
-    name: str
-    num_samples: int
+    path: str
 
 
 class DatasetMetadata(BaseModel):
     total_samples: int
+    score_threshold: float
     files: list[FileMetadata]
 
 
@@ -57,12 +57,22 @@ class WorldSampleDataset(Dataset):
         self.volume_indices = []
         self.sample_sizes = []
         for file_metadata in self.metadata.files:
-            file_path = os.path.join(data_dir, file_metadata.name)
-            data = th.load(file_path, map_location=self.device)
-            self.data.append(data)
-            self.volume_indices.append(th.nonzero(data))
-            self.sample_sizes.append(file_metadata.num_samples)
-        
+            file_path = os.path.join(data_dir, file_metadata.path)
+            raw_data = th.load(file_path, map_location=self.device)
+            region_data = raw_data["region"]
+            score_data = raw_data["scores"]
+            assert region_data.shape == score_data.shape, (
+                f"Region data shape {region_data.shape} does not match score data shape {score_data.shape}"
+            )
+
+            score_mask = score_data > self.metadata.score_threshold
+            if not th.any(score_mask):
+                continue    # Skip file if no scores are above threshold
+
+            self.data.append(region_data)
+            self.volume_indices.append(th.nonzero(score_mask).astype(th.uint16))
+            self.sample_sizes.append(th.sum(score_mask).item())
+
         assert len(self.data) == len(self.volume_indices) == len(self.sample_sizes)
         assert sum(self.sample_sizes) == self.metadata.total_samples, (
             f"Total samples in metadata ({self.metadata.total_samples}) "
@@ -96,7 +106,7 @@ class WorldSampleDataset(Dataset):
 
     def __getitem__(self, index: int) -> th.Tensor:
         file_index, sample_index = self._get_data_indices(index)
-        sample = self.data[file_index][sample_index]
+        sample = self._get_sample(file_index, sample_index)
 
         if self.transform is not None:
             sample = self.transform(sample)
