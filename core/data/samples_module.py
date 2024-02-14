@@ -1,6 +1,5 @@
 import os
 import shutil
-import subprocess
 import torch as th
 import lightning as L
 from core.extract import extract_world

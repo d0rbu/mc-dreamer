@@ -5,7 +5,6 @@ from core.extract.extract import extract_world
 def extract_data(
     output_dir: str | os.PathLike = "outputs",
     raw_output_dir: str | os.PathLike = "raw_outputs",
-    score_threshold: float = 0.5,
 ) -> None:
     for file in os.listdir(raw_output_dir):
         file_path = os.path.join(raw_output_dir, file)
@@ -13,7 +12,7 @@ def extract_data(
             continue
         
         if file.endswith(".zip") or os.path.isdir(file_path):
-            extract_world(file_path, output_dir, score_threshold=score_threshold)
+            extract_world(file_path, output_dir)
         else:
             print(f"Unknown file type: {file}")
         
@@ -21,4 +20,4 @@ def extract_data(
 
 
 if __name__ == "__main__":
-    extract_data(score_threshold=0.7)
+    extract_data()

@@ -207,7 +207,7 @@ def save_samples(
     }
 
     size_str = "x".join(map(str, ndarray_region.shape))
-    th.save(joined_samples, os.path.join(output_dir, f"{size_str}{sample_name}.pt"))
+    th.save(joined_samples, os.path.join(output_dir, f"{size_str}_{sample_name}.pt"))
 
 _print = print
 # only print from rank 0

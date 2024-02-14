@@ -12,9 +12,13 @@ class FileMetadata(BaseModel):
 
 
 class DatasetMetadata(BaseModel):
-    total_samples: int
     score_threshold: float
-    files: list[FileMetadata]
+    num_train_samples: int
+    num_val_samples: int
+    num_test_samples: int
+    train: list[FileMetadata]
+    val: list[FileMetadata]
+    test: list[FileMetadata]
 
 
 class WorldSampleDataset(Dataset):
@@ -28,22 +32,11 @@ class WorldSampleDataset(Dataset):
         device: th.device = th.device("cpu"),
     ) -> None:
         super().__init__()
-        self.data_dir = os.path.join(data_dir, split)
         self.sample_size = sample_size
         self.transform = transform
         self.device = device
 
-        assert os.path.isdir(self.data_dir), f"{self.data_dir} is not a directory"
-
-        # Confirm that all files in data_dir are of valid sample size
-        sample_size_string = "x".join(map(str, sample_size))
-        for file in os.listdir(data_dir):
-            if file.startswith(sample_size_string) or file == metadata_file:
-                continue
-            else:
-                raise ValueError(
-                    f"Invalid sample size for file {file}, expected {sample_size}"
-                )
+        assert os.path.isdir(data_dir), f"{data_dir} is not a directory"
 
         # Load metadata
         metadata_path = os.path.join(data_dir, metadata_file)
@@ -52,11 +45,16 @@ class WorldSampleDataset(Dataset):
             self.metadata = json.load(metadata_file)
         self.metadata = DatasetMetadata(**self.metadata)
 
+        # Confirm that all files in are of valid sample size
+        sample_size_string = "x".join(map(str, sample_size))
+        self.files = [file for file in self.metadata[split] if file.path.startswith(sample_size_string)]
+        self.num_samples = self.metadata[f"num_{split}_samples"]
+
         # Load into memory
         self.data = []
         self.volume_indices = []
         self.sample_sizes = []
-        for file_metadata in self.metadata.files:
+        for file_metadata in self.files:
             file_path = os.path.join(data_dir, file_metadata.path)
             raw_data = th.load(file_path, map_location=self.device)
             region_data = raw_data["region"]
@@ -74,8 +72,8 @@ class WorldSampleDataset(Dataset):
             self.sample_sizes.append(th.sum(score_mask).item())
 
         assert len(self.data) == len(self.volume_indices) == len(self.sample_sizes)
-        assert sum(self.sample_sizes) == self.metadata.total_samples, (
-            f"Total samples in metadata ({self.metadata.total_samples}) "
+        assert sum(self.sample_sizes) == self.num_samples, (
+            f"Total samples in {split} set in metadata ({self.num_samples}) "
             f"does not match sum of sample sizes ({sum(self.sample_sizes)})"
         )
 
@@ -102,7 +100,7 @@ class WorldSampleDataset(Dataset):
         return data[sample_slice]
 
     def __len__(self) -> int:
-        return self.metadata.total_samples
+        return self.num_samples
 
     def __getitem__(self, index: int) -> th.Tensor:
         file_index, sample_index = self._get_data_indices(index)
