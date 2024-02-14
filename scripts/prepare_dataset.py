@@ -38,9 +38,53 @@ def generate_metadata(
 
     assert sum(split_ratios) == 1, "split_ratios must sum to 1"
 
-    train_list = []
-    val_list = []
-    test_list = []
+    # Collect all files with their sizes (as a proxy for number of samples)
+    all_files = []
+    for root, _, files in os.walk(outputs_dir):
+        for file in files:
+            passed_scores =
+            while
+            file_size = file_path.stat().st_size  # Using file size as a proxy
+            all_files.append({"path": str(file_path.relative_to(outputs_dir)), "size": file_size})
+
+    # Sort files by size in descending order (assuming larger size means more samples)
+    all_files.sort(key=lambda x: x['size'], reverse=True)
+
+    # Allocate files to train, val, and test sets
+    total_samples = len(all_files)
+    train_list, val_list, test_list = [], [], []
+    allocated_samples = 0
+
+    # Function to allocate files to a dataset list until it reaches its target size
+    def allocate_files(target_size, dataset_list, remaining_files):
+        while remaining_files and len(dataset_list) < target_size:
+            dataset_list.append(remaining_files.pop(0))
+
+    # Allocate to train
+    target_train_size = int(split_ratios[0] * total_samples)
+    allocate_files(target_train_size, train_list, all_files)
+
+    # Allocate to test
+    target_test_size = int(split_ratios[1] * total_samples)
+    allocate_files(target_test_size, test_list, all_files)
+
+    # Remaining files go to val
+    val_list.extend(all_files)  # Whatever remains goes to val
+
+    # Prepare metadata
+    metadata = {
+        "score_threshold": score_threshold,
+        "num_train_samples": len(train_list),
+        "num_val_samples": len(val_list),
+        "num_test_samples": len(test_list),
+        "train": [{"path": file['path']} for file in train_list],
+        "val": [{"path": file['path']} for file in val_list],
+        "test": [{"path": file['path']} for file in test_list],
+    }
+
+    with open(metadata_file, 'w') as json_file:
+        json.dump(metadata, json_file, indent=4)
+
 
     # sort files by # of samples
     # while len(train_list) < split_ratios[0] * total_samples:

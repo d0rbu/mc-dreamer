@@ -196,8 +196,7 @@ def save_samples(
     scores: np.ndarray,
     output_dir: str | os.PathLike,
     sample_name: str,
-    samples_per_file: int = 8192,
-    keep_last: bool = True,  # whether to keep the last remainder samples
+    sample_size: tuple[int, int, int] = (16, 16, 16),
 ) -> None:
     os.makedirs(output_dir, exist_ok=True)
 
@@ -206,7 +205,7 @@ def save_samples(
         "scores": th.tensor(scores, dtype=th.float32),
     }
 
-    size_str = "x".join(map(str, ndarray_region.shape))
+    size_str = "x".join(map(str, sample_size))
     th.save(joined_samples, os.path.join(output_dir, f"{size_str}_{sample_name}.pt"))
 
 _print = print
@@ -243,7 +242,7 @@ def extract_world(
 
         file_path = os.path.join(region_dir, f"{region_name}.mca")
         ndarray_region, scores = extract_from_region(file_path, sample_size)
-        save_samples(ndarray_region, scores, output_dir, region_name)
+        save_samples(ndarray_region, scores, output_dir, region_name, sample_size)
 
     vertical_edge_region_samples = available_regions[:-1] & available_regions[1:]
     horizontal_edge_region_samples = available_regions[:, :-1] & available_regions[:, 1:]
@@ -311,7 +310,7 @@ def extract_world(
 
         scores = extract_from_ndarray(unprocessed_sample, sample_size)
 
-        save_samples(unprocessed_sample, scores, output_dir, unprocessed_region_name)
+        save_samples(unprocessed_sample, scores, output_dir, unprocessed_region_name, sample_size)
 
 def extract_zipped_world(
     path: str | os.PathLike,
