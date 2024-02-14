@@ -45,17 +45,57 @@ def get_percentile_scores_external(
 ) -> list[tuple[str, int, float]]:
     raise NotImplementedError("External sort not implemented yet")
 
+def get_percentile_scores_random(
+    extraction_output_dir: str | os.PathLike,
+    percentiles: th.Tensor,
+    samples_per_file: int = 10,
+) -> list[tuple[str, int, float]]:
+    full_scores: list[tuple[str, int, float]] = []  # (file, index, score)
+
+    for root, subdirs, files in tqdm(os.walk(extraction_output_dir), desc="Randomly gathering scores"):
+        if not files:
+            continue
+
+        for file in files:
+            if not file.endswith(".scores"):
+                continue
+            
+            file_path = os.path.join(root, file)
+            import pdb; pdb.set_trace()
+            with open(file_path, "rb") as f:
+                scores = pickle.load(f)
+            
+            num_samples = len(scores)
+            selected_indices = np.random.choice(num_samples, min(samples_per_file, num_samples), replace=False)
+            
+            for i in range(selected_indices):
+                full_scores.append((file_path, i, scores[i]))
+    
+    full_scores = sorted(full_scores.items(), key=lambda x: x[1])
+    num_samples = len(full_scores)
+    percentiles = percentiles * num_samples
+    percentiles[-1] = num_samples - 1
+    percentiles = percentiles.to(int)
+    percentiles = percentiles.unique()
+
+    selected_scores = [full_scores[i] for i in percentiles]
+
+    return selected_scores
+
 def convert_percentiles(
     percentiles: th.Tensor,
     name: str | None = None,
     extraction_output_dir: str | os.PathLike = "outputs",
     schematic_dir: str | os.PathLike = "schematics_output",
+    randomly_sample: bool = True,
     num_external_sort_files: int = 0,  # max number of files at a time for external sort
 ) -> None:
     if name is not None:
         extraction_output_dir = os.path.join(extraction_output_dir, name)
 
-    if num_external_sort_files > 0:
+    if randomly_sample:
+        selected_scores = get_percentile_scores_random(extraction_output_dir, percentiles, num_external_sort_files)
+    elif num_external_sort_files > 0:
         selected_scores = get_percentile_scores_external(extraction_output_dir, percentiles, num_external_sort_files)
     else:
         selected_scores = get_percentile_scores(extraction_output_dir, percentiles)
