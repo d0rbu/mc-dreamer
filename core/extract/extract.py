@@ -223,6 +223,7 @@ def extract_world(
     output_dir: str | os.PathLike = "outputs",
     intermediate_output_dir: str | os.PathLike = "intermediate_outputs",
     sample_size: tuple[int, int, int] = (16, 16, 16),
+    extract_edge_and_corner_samples: bool = False,
 ) -> None:
     if os.path.isfile(path):
         path = extract_zipped_world(path, intermediate_output_dir)
@@ -249,6 +250,10 @@ def extract_world(
         file_path = os.path.join(region_dir, f"{region_name}.mca")
         ndarray_region, scores = extract_from_region(file_path, sample_size)
         save_samples(ndarray_region, scores, output_dir, region_name, sample_size)
+    
+    if not extract_edge_and_corner_samples:
+        print("Done!")
+        return
 
     vertical_edge_region_samples = available_regions[:-1] & available_regions[1:]
     horizontal_edge_region_samples = available_regions[:, :-1] & available_regions[:, 1:]
