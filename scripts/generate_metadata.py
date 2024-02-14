@@ -1,5 +1,6 @@
 import os
 import json
+import argparse
 
 
 def generate_metadata(
@@ -7,10 +8,8 @@ def generate_metadata(
     metadata_file: str | os.PathLike = "metadata.json",
     score_threshold: float = 0.7,
 ) -> None:
-    # TODO: walk through outputs_dir and generate metadata.json
     # metadata.json should be a json of the following format
     # {
-    #     "total_samples": int,
     #     "score_threshold": float,
     #     "files": [
     #         {
@@ -20,7 +19,6 @@ def generate_metadata(
     #     ]
     # }
 
-    total_samples = 0
     files_list = []
 
     for root, _, files in os.walk(outputs_dir):
@@ -30,10 +28,8 @@ def generate_metadata(
             files_list.append({
                 "path": relative_path
             })
-            total_samples += 1
 
     metadata = {
-        "total_samples": total_samples,
         "score_threshold": score_threshold,
         "files": files_list
     }
@@ -41,6 +37,16 @@ def generate_metadata(
     with open(metadata_file, 'w') as json_file:
         json.dump(metadata, json_file, indent=4)
 
-    return None
-    
-    raise NotImplementedError("generate_metadata not implemented yet")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--threshold", type=float, default=0.7)
+    parser.add_argument("--outputs_dir", type=str, default="outputs")
+    parser.add_argument("--metadata_file", type=str, default="metadata.json")
+    args = parser.parse_args()
+
+    generate_metadata(
+        outputs_dir=args.outputs_dir,
+        metadata_file=args.metadata_file,
+        score_threshold=args.threshold
+    )

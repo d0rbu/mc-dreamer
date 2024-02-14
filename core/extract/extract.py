@@ -195,13 +195,10 @@ def save_samples(
     ndarray_region: np.ndarray,
     scores: np.ndarray,
     output_dir: str | os.PathLike,
-    source_identifier: str | None = None,
+    sample_name: str,
     samples_per_file: int = 8192,
     keep_last: bool = True,  # whether to keep the last remainder samples
 ) -> None:
-    if source_identifier is not None:
-        output_dir = os.path.join(output_dir, source_identifier)
-
     os.makedirs(output_dir, exist_ok=True)
 
     joined_samples = {
@@ -209,7 +206,8 @@ def save_samples(
         "scores": th.tensor(scores, dtype=th.float32),
     }
 
-    th.save(joined_samples, os.path.join(output_dir, f"{uuid4()}.pt"))
+    size_str = "x".join(map(str, ndarray_region.shape))
+    th.save(joined_samples, os.path.join(output_dir, f"{size_str}{sample_name}.pt"))
 
 _print = print
 # only print from rank 0
