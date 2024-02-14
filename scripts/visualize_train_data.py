@@ -56,19 +56,18 @@ def get_percentile_scores_random(
         if not files:
             continue
 
-        for file in files:
+        for file in tqdm(files, total=len(files), leave=False):
             if not file.endswith(".scores"):
                 continue
             
             file_path = os.path.join(root, file)
-            import pdb; pdb.set_trace()
             with open(file_path, "rb") as f:
                 scores = pickle.load(f)
             
             num_samples = len(scores)
             selected_indices = np.random.choice(num_samples, min(samples_per_file, num_samples), replace=False)
             
-            for i in range(selected_indices):
+            for i in selected_indices:
                 full_scores.append((file_path, i, scores[i]))
     
     full_scores = sorted(full_scores.items(), key=lambda x: x[1])
@@ -87,14 +86,14 @@ def convert_percentiles(
     name: str | None = None,
     extraction_output_dir: str | os.PathLike = "outputs",
     schematic_dir: str | os.PathLike = "schematics_output",
-    randomly_sample: bool = True,
+    num_sampled: int = 0,  # number of files to sample
     num_external_sort_files: int = 0,  # max number of files at a time for external sort
 ) -> None:
     if name is not None:
         extraction_output_dir = os.path.join(extraction_output_dir, name)
 
-    if randomly_sample:
-        selected_scores = get_percentile_scores_random(extraction_output_dir, percentiles, num_external_sort_files)
+    if num_sampled > 0:
+        selected_scores = get_percentile_scores_random(extraction_output_dir, percentiles, num_sampled)
     elif num_external_sort_files > 0:
         selected_scores = get_percentile_scores_external(extraction_output_dir, percentiles, num_external_sort_files)
     else:
@@ -122,4 +121,4 @@ def convert_percentiles(
 if __name__ == "__main__":
     percentiles = th.linspace(0, 1, 101)
 
-    convert_percentiles(percentiles)
+    convert_percentiles(percentiles, num_sampled=8)
