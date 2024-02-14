@@ -191,6 +191,10 @@ def get_corner_samples(
 
     return extracted_corner_region
 
+def sample_filename(sample_name: str, sample_size: tuple[int, int, int]) -> str:
+    size_str = "x".join(map(str, sample_size))
+    return f"{size_str}_{sample_name}.pt"
+
 def save_samples(
     ndarray_region: np.ndarray,
     scores: np.ndarray,
@@ -205,8 +209,8 @@ def save_samples(
         "scores": th.tensor(scores, dtype=th.float32),
     }
 
-    size_str = "x".join(map(str, sample_size))
-    th.save(joined_samples, os.path.join(output_dir, f"{size_str}_{sample_name}.pt"))
+    filename = sample_filename(sample_name, sample_size)
+    th.save(joined_samples, os.path.join(output_dir, filename))
 
 _print = print
 # only print from rank 0
@@ -237,7 +241,9 @@ def extract_world(
 
         x, z = region_index_chunk[rank]
         region_name = f"r.{x}.{z}"
-        if os.path.exists(os.path.join(output_dir, region_name)):  # skip already processed regions
+        filename = sample_filename(region_name, sample_size)
+
+        if os.path.exists(os.path.join(output_dir, filename)):  # skip already processed regions
             continue
 
         file_path = os.path.join(region_dir, f"{region_name}.mca")
@@ -266,6 +272,7 @@ def extract_world(
             unprocessed_samples[new_file_path] = np.load(new_file_path)
         else:
             unprocessed_samples[new_file_path] = get_edge_samples(file_paths, axis=0)
+            np.save(new_file_path, unprocessed_samples[new_file_path])
 
     for sample_index_chunk in chunked(np.nonzero(horizontal_edge_region_samples), world_size):
         if len(sample_index_chunk) <= rank:  # no more work left for us this iteration!
@@ -282,6 +289,7 @@ def extract_world(
             unprocessed_samples[new_file_path] = np.load(new_file_path)
         else:
             unprocessed_samples[new_file_path] = get_edge_samples(file_paths, axis=2)
+            np.save(new_file_path, unprocessed_samples[new_file_path])
 
     for sample_index_chunk in chunked(np.nonzero(corner_region_samples), world_size):
         if len(sample_index_chunk) <= rank:  # no more work left for us this iteration!
@@ -300,12 +308,15 @@ def extract_world(
             unprocessed_samples[new_file_path] = np.load(new_file_path)
         else:
             unprocessed_samples[new_file_path] = get_corner_samples(file_paths)
+            np.save(new_file_path, unprocessed_samples[new_file_path])
 
     print("Filtering extracted edge and corner samples...")
 
     for unprocessed_file_path, unprocessed_sample in tqdm(unprocessed_samples.items(), total=len(unprocessed_samples), leave=False, desc="Extracting edge and corner samples"):
         unprocessed_region_name = os.path.basename(unprocessed_file_path).replace(".npy", "")
-        if os.path.exists(os.path.join(output_dir, unprocessed_region_name)):  # skip already processed sections
+        filename = sample_filename(unprocessed_region_name, sample_size)
+
+        if os.path.exists(os.path.join(output_dir, filename)):  # skip already processed sections
             continue
 
         scores = extract_from_ndarray(unprocessed_sample, sample_size)
