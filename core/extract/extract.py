@@ -236,7 +236,12 @@ def extract_world(
     world_size = COMM.Get_size()
     os.makedirs(output_dir, exist_ok=True)
 
-    for region_index_chunk in tqdm(chunked(region_indices, world_size), total=available_regions.sum() // world_size, leave=False, desc="Extracting samples from regions"):
+    region_index_chunk_generator = chunked(region_indices, world_size)
+
+    if COMM.Get_rank() == 0:
+        region_index_chunk_generator = tqdm(region_index_chunk_generator, total=available_regions.sum() // world_size, leave=False, desc="Extracting samples from regions")
+
+    for region_index_chunk in region_index_chunk_generator:
         if len(region_index_chunk) <= rank:  # no more work left for us this iteration!
             break
 
@@ -338,6 +343,7 @@ def extract_zipped_world(
     name = os.path.basename(path_no_ext)
 
     world_parent_dir = os.path.join(intermediate_output_dir, name)
+    os.makedirs(world_parent_dir, exist_ok=True)
     with zipfile.ZipFile(path, "r") as zip_ref:
         zip_ref.extractall(world_parent_dir)
     

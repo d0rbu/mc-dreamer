@@ -90,13 +90,15 @@ def convert_percentiles(
     percentiles: th.Tensor,
     name: str | None = None,
     extraction_output_dir: str | os.PathLike = "outputs",
-    schematic_dir: str | os.PathLike = "schematics_output",
+    schematic_dir: str | os.PathLike = "schematics_outputs",
     num_sampled: int = 0,  # number of files to sample
     num_external_sort_files: int = 0,  # max number of files at a time for external sort
     threshold: float = 0.7,
 ) -> None:
     if name is not None:
         extraction_output_dir = os.path.join(extraction_output_dir, name)
+    
+    os.makedirs(schematic_dir, exist_ok=True)
 
     if num_sampled > 0:
         selected_scores = get_percentile_scores_random(extraction_output_dir, percentiles, num_sampled, threshold)
