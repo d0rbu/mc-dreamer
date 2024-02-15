@@ -107,36 +107,21 @@ class WorldSampleDataModule(L.LightningDataModule):
             self.scrape_data()
 
         self.prepare_data()
-    
-    def setup(self: Self, stage: str | None = None) -> None:
-        getattr(self, f"setup_{stage}", lambda: None)()
 
-    def setup_fit(self: Self) -> None:
-        self.train_dataset = WorldSampleDataset(
-            os.path.join(self.data_dir, "train"),
-            self.sample_size,
-            device = self.device,
-        )
+    def setup(self: Self, stage: str) -> None:
+        split_mappings = {
+            "fit": ["train", "val"],
+            "test": ["test"],
+            "predict": ["predict"],
+        }
 
-        self.val_dataset = WorldSampleDataset(
-            os.path.join(self.data_dir, "val"),
-            self.sample_size,
-            device = self.device,
-        )
-
-    def setup_test(self: Self) -> None:
-        self.test_dataset = WorldSampleDataset(
-            os.path.join(self.data_dir, "test"),
-            self.sample_size,
-            device = self.device,
-        )
-
-    def setup_predict(self: Self) -> None:
-        self.predict_dataset = WorldSampleDataset(
-            os.path.join(self.data_dir, "predict"),
-            self.sample_size,
-            device = self.device,
-        )
+        for split in split_mappings[stage]:
+            setattr(self, f"{split}_dataset", WorldSampleDataset(
+                data_dir = self.data_dir,
+                split = split,
+                sample_size = self.sample_size,
+                device = self.device,
+            ))
 
     def train_dataloader(self: Self) -> DataLoader:
         return DataLoader(self.train_dataset, batch_size=self.batch_size, num_workers=self.num_workers)
