@@ -343,6 +343,7 @@ def extract_zipped_world(
     name = os.path.basename(path_no_ext)
 
     world_parent_dir = os.path.join(intermediate_output_dir, name)
+    os.makedirs(world_parent_dir, exist_ok=True)
     with zipfile.ZipFile(path, "r") as zip_ref:
         zip_ref.extractall(world_parent_dir)
     
