@@ -44,7 +44,7 @@ class WorldSampleDataModule(L.LightningDataModule):
         if raw_data_dir is None:
             raw_data_dir = self.raw_data_dir
 
-        raise NotImplementedError("Implement me!")
+        raise NotImplementedError("Scraping data from data module not implemented")
 
     def extract_data(
         self: Self,

@@ -9,6 +9,7 @@ from functools import cache
 
 class FileMetadata(BaseModel):
     path: str
+    size: int
 
 
 class DatasetMetadata(BaseModel):
@@ -56,6 +57,11 @@ class WorldSampleDataset(Dataset):
         self.sample_sizes = []
         for file_metadata in self.files:
             file_path = os.path.join(data_dir, file_metadata.path)
+            assert os.path.isfile(file_path), f"{file_path} is not a file"
+
+            if file_metadata.size <= 0:
+                continue
+
             raw_data = th.load(file_path, map_location=self.device)
             region_data = raw_data["region"]
             score_data = raw_data["scores"]
@@ -64,6 +70,11 @@ class WorldSampleDataset(Dataset):
             )
 
             score_mask = score_data > self.metadata.score_threshold
+
+            assert score_mask.sum() == file_metadata.size, (
+                f"Score mask sum {score_mask.sum()} does not match file size {file_metadata.size}"
+            )
+
             if not th.any(score_mask):
                 continue    # Skip file if no scores are above threshold
 
