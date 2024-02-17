@@ -31,8 +31,8 @@ def get_percentile_scores(
     full_scores = sorted(full_scores, key=lambda x: x[1])
     num_samples = len(full_scores)
     percentiles = percentiles * num_samples
-    percentiles[-1] = num_samples - 1
     percentiles = percentiles.to(int)
+    percentiles[-1] = num_samples - 1
     percentiles = percentiles.unique()
 
     selected_scores = [full_scores[i] for i in percentiles]
@@ -130,7 +130,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert percentiles to schematics")
     parser.add_argument("--name", type=str, help="Name of the output directory")
     parser.add_argument("--extraction_output_dir", type=str, default="outputs", help="Directory containing extraction output")
-    parser.add_argument("--schematic_dir", type=str, default="schematics_output", help="Directory to save schematics")
+    parser.add_argument("--schematic_dir", type=str, default="schematics_outputs", help="Directory to save schematics")
     parser.add_argument("--num_external_sort_files", type=int, default=0, help="Max number of files at a time for external sort")
     parser.add_argument("--percentiles-min", type=float, default=0, help="Minimum percentile")
     parser.add_argument("--percentiles-max", type=float, default=1, help="Maximum percentile")
