@@ -2,6 +2,7 @@ import os
 import json
 import argparse
 import torch as th
+from tqdm import tqdm
 from core.data.samples_dataset import DatasetMetadata, FileMetadata
 
 
@@ -19,7 +20,7 @@ def allocate_files(
         if size_difference <= 0:
             break
 
-        if file["size"] > size_difference:
+        if file.size > size_difference:
             continue
 
         dataset_list.append(file)
@@ -27,7 +28,7 @@ def allocate_files(
 
 def generate_metadata(
     outputs_dir: str | os.PathLike = "outputs",
-    metadata_file: str | os.PathLike = "metadata.json",
+    metadata_filename: str | os.PathLike = "metadata.json",
     score_threshold: float = 0.7,
     split_ratios: tuple[float, float, float] = (0.9, 0.05, 0.05),  # train, val, test
 ) -> None:
@@ -62,13 +63,15 @@ def generate_metadata(
 
     assert sum(split_ratios) == 1, "split_ratios must sum to 1"
 
+    print("Collecting files...")
+
     # Collect all files with their sizes (in number of samples)
     all_files = []
-    for root, _, files in os.walk(outputs_dir):
+    for root, _, files in tqdm(os.walk(outputs_dir)):
         if not files:
             continue
 
-        for file in files:
+        for file in tqdm(files, leave=False):
             if not file.endswith(".pt"):
                 continue
 
@@ -79,12 +82,14 @@ def generate_metadata(
             all_files.append(FileMetadata(path=relative_path, size=num_samples))
 
             del samples
+    
+    print("Allocating files...")
 
     # Sort files by size in descending order (assuming larger size means more samples)
     all_files.sort(key=lambda x: x.size, reverse=True)
 
     # Allocate files to train, val, and test sets
-    total_samples = len(all_files)
+    total_samples = sum_sizes(all_files)
     val_files, test_files = [], []
 
     # Allocate to test
@@ -98,6 +103,8 @@ def generate_metadata(
     # Remaining files are allocated to train
     train_files = all_files
 
+    print("Writing metadata...")
+
     # Prepare metadata
     metadata = DatasetMetadata(
         score_threshold=score_threshold,
@@ -109,19 +116,19 @@ def generate_metadata(
         test=test_files,
     )
 
-    with open(metadata_file, 'w') as json_file:
-        json.dump(metadata, json_file, indent=4)
+    with open(os.path.join(outputs_dir, metadata_filename), "w") as metadata_file:
+        metadata_file.write(metadata.model_dump_json(indent=4))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--threshold", type=float, default=0.7)
     parser.add_argument("--outputs_dir", type=str, default="outputs")
-    parser.add_argument("--metadata_file", type=str, default="metadata.json")
+    parser.add_argument("--metadata_filename", type=str, default="metadata.json")
     args = parser.parse_args()
 
     generate_metadata(
         outputs_dir=args.outputs_dir,
-        metadata_file=args.metadata_file,
+        metadata_filename=args.metadata_filename,
         score_threshold=args.threshold
     )
