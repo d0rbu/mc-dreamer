@@ -30,7 +30,7 @@ def generate_metadata(
     outputs_dir: str | os.PathLike = "outputs",
     metadata_filename: str | os.PathLike = "metadata.json",
     score_threshold: float = 0.7,
-    split_ratios: tuple[float, float, float] = (0.9, 0.05, 0.05),  # train, val, test
+    split_ratios: tuple[float, float, float] = (0.994, 0.001, 0.005),  # train, val, test
 ) -> None:
     # metadata.json should be a json of the following format
     # {

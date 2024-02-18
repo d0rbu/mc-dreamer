@@ -3,7 +3,7 @@ import json
 import torch as th
 from torch.utils.data import Dataset
 from pydantic import BaseModel
-from typing import Self
+from typing import Self, Callable
 from functools import cache
 
 
@@ -29,7 +29,7 @@ class WorldSampleDataset(Dataset):
         split: str = "train",
         sample_size: tuple[int, int, int] = (16, 16, 16),
         metadata_file: str | os.PathLike = "metadata.json",
-        transform: th.nn.Module | None = None,
+        transform: Callable[[th.Tensor], th.Tensor] | None = None,
         device: th.device = th.device("cpu"),
     ) -> None:
         super().__init__()
