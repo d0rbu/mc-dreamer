@@ -63,8 +63,8 @@ class WorldSampleDataset(Dataset):
                 continue
 
             raw_data = th.load(file_path, map_location=self.device)
-            region_data = raw_data["region"]
-            score_data = raw_data["scores"]
+            region_data = th.permute(raw_data["region"], (1, 2, 0))  # (X, Y, Z) -> (Y, Z, X)
+            score_data = th.permute(raw_data["scores"], (1, 2, 0))  # (X, Y, Z) -> (Y, Z, X)
             assert region_data.shape == score_data.shape, (
                 f"Region data shape {region_data.shape} does not match score data shape {score_data.shape}"
             )

@@ -3,11 +3,12 @@ import lightning as L
 import torch as th
 from typing import Self
 from core.model.structure_transformer import StructureTransformer
+from core.model.util import generate_binary_mapping
 
 
 class StructureModule(L.LightningModule):
     """
-    Module for structure prediction.
+    Module for autoregressive structure prediction.
     """
 
     def __init__(
@@ -20,39 +21,49 @@ class StructureModule(L.LightningModule):
         lr: float = 1e-3,
     ) -> None:
         super().__init__()
-        # Use autoregressive model to do sequeence modeling 
-        # Break into 8 voxels at a time 
-        
+        # use autoregressive model to do sequence modelling on the structure
+        # break into tubes of voxels (does not necessarily span the entire sample). tube_length = 1 for voxel-level prediction
+
         self.sample_size = sample_size
         self.tube_length = tube_length
         self.total_sample_size = sample_size[0] * sample_size[1] * sample_size[2]
         self.tubes_per_sample = self.total_sample_size // tube_length
+        self.special_tokens = ["BOS"]  # we can have up to 2 ^ tube_length - 1 special tokens due to the way we encode them as tubes
+        self.special_token_tubes = self._generate_special_token_tubes(self.special_tokens)
+        self.num_special_tokens = len(self.special_tokens)
 
-        assert sample_size[-1] % tube_length == 0, f"sample_size[-1] must be divisible by tube_length"
+        assert self.total_sample_size % self.tube_length == 0, f"sample_size must be divisible by tube_length"
 
         self.model = StructureTransformer(
-            sample_size=sample_size,
-            tube_length=tube_length,
+            sample_size=self.sample_size,
+            tube_length=self.tube_length,
             num_blocks=num_blocks,
             d_model=d_model,
             n_head=n_head,
+            num_special_tokens=self.num_special_tokens,
         )
         self.lr = lr
         self.loss_fn = th.nn.CrossEntropyLoss()
+
+    def _generate_special_token_tubes(
+        self: Self,
+        special_tokens: list[str],
+    ) -> dict[str, th.Tensor]:
+        special_token_tubes = -generate_binary_mapping(len(special_tokens) + 1, self.tube_length)[1:].int()
+        return {token: tube for token, tube in zip(special_tokens, special_token_tubes)}
 
     def forward(self, x):
         return self.model(x)
 
     def training_step(self, batch, batch_idx):
         target = batch > 0  # solid structure
-        target = target.view(-1, self.tubes_per_sample, self.tube_length)  # (B, X, Y, Z) -> (B, X*Y*Z/tube_length, tube_length)
-        # Shift target back by 1 to get input: (A, B, C) -> (<start>, A, B)
-        # Start token at the start of every sequence (absolute positional embedding will give us sufficient information about y level)
-        inputs = th.zeros_like(target)
-        inputs[:, 1:] = target[:, :-1]
-        inputs[:, 0] = -1  # start token
+        target = target.view(-1, self.tubes_per_sample, self.tube_length)  # (B, Y, Z, X) -> (B, T, tube_length)
+        # Shift target back by 1 to get input: (A, B, C) -> (<|BOS|>, A, B)
+        # BOS token (encoded as a tube) at the start of every sequence
+        inputs = th.roll(target, shifts=1, dims=1)
+        inputs[:, 0, :] = self.special_token_tubes["BOS"]
 
-        output = self(inputs)
+        output = self(inputs)  # (B, T, tube_length) -> (B, T, tube_length)
         loss = self.loss_fn(output, target)
         return loss
 
