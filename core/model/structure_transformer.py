@@ -46,6 +46,7 @@ class StructureTransformer(nn.Module):
     def forward(
         self: Self,
         x: th.Tensor,
+        y_indices: th.Tensor,
     ) -> th.Tensor:
         original_shape = x.shape
 
@@ -56,7 +57,7 @@ class StructureTransformer(nn.Module):
         x = x % self.num_token_types  # convert -1, -2, etc. to num_token_types-1, num_token_types-2, etc.
         x = self.tube_in_embedding(x)  # (B, T) -> (B, T, d_model)
 
-        x = self.transformer(x)  # (B, T, d_model) -> (B, T, d_model)
+        x = self.transformer(x, y_indices)  # (B, T, d_model) -> (B, T, d_model)
 
         x = self.tube_out_embedding(x)  # (B, T, d_model) -> (B, T, num_tube_types)
         # turn distribution of tube types into distribution of solid/air blocks

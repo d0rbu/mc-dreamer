@@ -97,7 +97,7 @@ class WorldSampleDataset(Dataset):
             else:
                 sample_index -= sample_size
 
-    def _get_sample(self: Self, data_index: int, sample_index: int) -> th.Tensor:
+    def _get_sample(self: Self, data_index: int, sample_index: int) -> tuple[th.Tensor, int]:
         volume_index = self.volume_indices[data_index][sample_index]
         data = self.data[data_index]
         sample_slice = tuple(
@@ -108,16 +108,16 @@ class WorldSampleDataset(Dataset):
             for i in range(3)
         )
 
-        return data[sample_slice]
+        return data[sample_slice], volume_index[0].item()
 
     def __len__(self) -> int:
         return self.num_samples
 
-    def __getitem__(self, index: int) -> th.Tensor:
+    def __getitem__(self, index: int) -> tuple[th.Tensor, int]:
         file_index, sample_index = self._get_data_indices(index)
-        sample = self._get_sample(file_index, sample_index)
+        sample, sample_index = self._get_sample(file_index, sample_index)
 
         if self.transform is not None:
             sample = self.transform(sample)
 
-        return sample
+        return sample, sample_index

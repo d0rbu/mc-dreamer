@@ -52,18 +52,23 @@ class StructureModule(L.LightningModule):
         special_token_tubes = -generate_binary_mapping(len(special_tokens) + 1, self.tube_length)[1:].int()
         return {token: tube for token, tube in zip(special_tokens, special_token_tubes)}
 
-    def forward(self, x):
-        return self.model(x)
+    def forward(
+        self: Self,
+        x: th.Tensor,
+        y_indices: th.Tensor,
+    ) -> th.Tensor:
+        return self.model(x, y_indices)
 
     def training_step(self, batch, batch_idx):
-        target = batch > 0  # solid structure
+        target, y_indices = batch
+        target = target > 0  # solid structure
         target = target.view(-1, self.tubes_per_sample, self.tube_length)  # (B, Y, Z, X) -> (B, T, tube_length)
         # Shift target back by 1 to get input: (A, B, C) -> (<|BOS|>, A, B)
         # BOS token (encoded as a tube) at the start of every sequence
         inputs = th.roll(target, shifts=1, dims=1)
         inputs[:, 0, :] = self.special_token_tubes["BOS"]
 
-        output = self(inputs)  # (B, T, tube_length) -> (B, T, tube_length)
+        output = self(inputs, y_indices)  # (B, T, tube_length) -> (B, T, tube_length)
         loss = self.loss_fn(output, target)
         return loss
 
