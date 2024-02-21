@@ -2,6 +2,7 @@ import os
 import lightning as L
 import torch as th
 from typing import Self
+from core.model.sinkformer import SinkFormerConfig
 from core.model.structure_transformer import StructureTransformer
 from core.model.util import generate_binary_mapping
 
@@ -15,9 +16,7 @@ class StructureModule(L.LightningModule):
         self: Self,
         sample_size: tuple[int, int, int] = (16, 16, 16),
         tube_length: int = 8,
-        num_blocks: int = 6,
-        d_model: int = 512,
-        n_head: int = 8,
+        config: SinkFormerConfig = SinkFormerConfig(),
         lr: float = 1e-3,
     ) -> None:
         super().__init__()
@@ -37,10 +36,7 @@ class StructureModule(L.LightningModule):
         self.model = StructureTransformer(
             sample_size=self.sample_size,
             tube_length=self.tube_length,
-            num_blocks=num_blocks,
-            d_model=d_model,
-            n_head=n_head,
-            num_special_tokens=self.num_special_tokens,
+            config=config,
         )
         self.lr = lr
         self.loss_fn = th.nn.CrossEntropyLoss()
