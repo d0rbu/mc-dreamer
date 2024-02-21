@@ -27,9 +27,9 @@ class PositionalEmbeddings(nn.Module):
         return self.positional_embeddings[positions]
 
 
-class ControlEmbedding(nn.Module):
+class ControlEmbedder(nn.Module):
     def __init__(self, embedding_dim: int, pos_embedding_dim: int | None = None):
-        super(ControlEmbedding, self).__init__()
+        super(ControlEmbedder, self).__init__()
 
         if pos_embedding_dim is None:
             pos_embedding_dim = embedding_dim
@@ -54,21 +54,17 @@ class ColorModule(ElucidatedDiffusion):
         self: Self,
         img_size: int = (16,16,16), # Now is a tuple
         # Killed Loss type (now for classification)
-        d_model: int = 512,
-        self_cond: bool = True,
-        ode_solver: str = 'ddim',
-        time_delta: float = 0.,
-        sample_steps: int = 35,
-        norm_forward: Optional[Callable] = None,
-        norm_backward: Optional[Callable] = None,
-        data_key: str = 'smap',
-        ctrl_key: Optional[str] = None,
+        config = None,  # TODO: use hf config for whatever model we use
         **kwargs,
     ) -> None:
-        model = None  # TODO: implement model  Hugging model here: 
-        embedder = ControlEmbedding(d_model)
-        super().__init__(model, img_size, self_cond, ode_solver, time_delta, sample_steps, norm_forward, norm_backward, data_key, ctrl_key, **kwargs)
+        model = None  # TODO: use a huggingface conditional unet or something
+
+        super().__init__(model, img_size, **kwargs)
+
+        self.ctrl_emb = ControlEmbedder(config.hidden_size)
 
     @override
     def criterion(self) -> Callable:
         return th.nn.CrossEntropyLoss()  # CE for classification instead of regression
+    
+    # TODO: override loss function to apply criterion over structure instead of the whole sample
