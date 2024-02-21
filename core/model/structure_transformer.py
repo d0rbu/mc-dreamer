@@ -16,7 +16,7 @@ class StructureTransformer(nn.Module):
         num_blocks: int = 6,
         d_model: int = 512,
         n_head: int = 8,
-        num_special_tokens: int = 2,
+        num_special_tokens: int = 3,
     ) -> None:
         super().__init__()
 

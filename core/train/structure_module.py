@@ -28,7 +28,7 @@ class StructureModule(L.LightningModule):
         self.tube_length = tube_length
         self.total_sample_size = sample_size[0] * sample_size[1] * sample_size[2]
         self.tubes_per_sample = self.total_sample_size // tube_length
-        self.special_tokens = ["BOS"]  # we can have up to 2 ^ tube_length - 1 special tokens due to the way we encode them as tubes
+        self.special_tokens = ["PAD", "BOS", "EOS"]  # we can have up to 2 ^ tube_length - 1 special tokens due to the way we encode them as tubes
         self.special_token_tubes = self._generate_special_token_tubes(self.special_tokens)
         self.num_special_tokens = len(self.special_tokens)
 

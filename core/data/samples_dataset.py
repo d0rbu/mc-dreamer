@@ -115,9 +115,9 @@ class WorldSampleDataset(Dataset):
 
     def __getitem__(self, index: int) -> tuple[th.Tensor, int]:
         file_index, sample_index = self._get_data_indices(index)
-        sample, sample_index = self._get_sample(file_index, sample_index)
+        sample, y_index = self._get_sample(file_index, sample_index)
 
         if self.transform is not None:
             sample = self.transform(sample)
 
-        return sample, sample_index
+        return sample, y_index
