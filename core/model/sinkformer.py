@@ -1,6 +1,6 @@
 import torch as th
 import torch.nn as nn
-from transformers.models.llama.modeling_llama import LlamaPreTrainedModel, LlamaConfig, LlamaModel
+from transformers.models.llama.modeling_llama import LlamaConfig, LlamaModel
 from typing import Self
 
 
@@ -38,26 +38,15 @@ class SinkFormer(LlamaModel):
         self: Self,
         config: SinkFormerConfig,
     ) -> None:
-        self.sink_keys = nn.ModuleList(
-            [
-                nn.Parameter(th.empty((config.num_key_value_heads, config.hidden_size // config.num_attention_heads)))
-                for _ in range(config.num_hidden_layers)
-            ]
-        )
-        self.sink_values = nn.ModuleList(
-            [
-                nn.Parameter(th.empty((config.num_key_value_heads, config.hidden_size // config.num_attention_heads)))
-                for _ in range(config.num_hidden_layers)
-            ]
-        )
+        self.sink_key_values = nn.Parameter(th.empty((config.num_hidden_layers, 1, 2, config.num_key_value_heads, config.hidden_size // config.num_attention_heads)))
 
         super().__init__(config)
 
     def forward(
         self: Self,
         inputs_embeds: th.Tensor,
-        attention_mask: th.Tensor | None = None,
         start_pos_indices: th.Tensor | None = None,
+        attention_mask: th.Tensor | None = None,
         past_key_values: list[th.FloatTensor] | None = None,
         output_attentions: bool = False,
         output_hidden_states: bool = False,
@@ -71,16 +60,15 @@ class SinkFormer(LlamaModel):
             position_ids += start_pos_indices
 
         if past_key_values is None:
-            past_key_values = []
+            past_key_values = [[] * self.config.num_hidden_layers]
 
-        sink_key_values = [
-            (self.sink_keys[i], self.sink_values[i]) for i in range(len(self.config.num_hidden_layers))
-        ].extend(past_key_values)
+        for layer_idx, layer_past_key_values in enumerate(past_key_values):
+            layer_past_key_values = th.cat([self.sink_key_values[layer_idx], layer_past_key_values], dim=0)
 
         return super().forward(
             attention_mask=attention_mask,
             position_ids=position_ids,
-            past_key_values=sink_key_values,
+            past_key_values=past_key_values,
             inputs_embeds=inputs_embeds,
             use_cache=True,
             output_attentions=output_attentions,

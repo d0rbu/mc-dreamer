@@ -1,6 +1,7 @@
 import torch as th
 import torch.nn as nn
 from core.model.util import generate_binary_mapping
+from core.model.sinkformer import SinkFormer, SinkFormerConfig
 from typing import Self
 
 
@@ -13,9 +14,7 @@ class StructureTransformer(nn.Module):
         self: Self,
         sample_size: tuple[int, int, int] = (16, 16, 16),
         tube_length: int = 8,
-        num_blocks: int = 6,
-        d_model: int = 512,
-        n_head: int = 8,
+        config: SinkFormerConfig = SinkFormerConfig(),
         num_special_tokens: int = 3,
     ) -> None:
         super().__init__()
@@ -26,8 +25,6 @@ class StructureTransformer(nn.Module):
         self.tube_length = tube_length
         self.total_sample_size = sample_size[0] * sample_size[1] * sample_size[2]
         self.tubes_per_sample = self.total_sample_size // tube_length
-        self.num_blocks = num_blocks
-        self.d_model = d_model
 
         assert self.total_sample_size % tube_length == 0, f"sample_size must be divisible by tube_length"
 
@@ -37,11 +34,10 @@ class StructureTransformer(nn.Module):
         self.tube_to_idx = th.Tensor([1 << i for i in range(tube_length)]).int()  # (tube_length,)
         self.idx_to_tube = generate_binary_mapping(self.num_tube_types, self.tube_length)  # (num_tube_types, tube_length)
 
-        self.tube_in_embedding = nn.Embedding(self.num_token_types, d_model)
-        self.tube_out_embedding = nn.Linear(d_model, self.num_tube_types)
+        self.tube_in_embedding = nn.Embedding(self.num_token_types, config.hidden_size)
+        self.tube_out_embedding = nn.Linear(config.hidden_size, self.num_tube_types)
 
-        # TODO: probably use a custom model based on llama or something that can accept an absolute position and uses sink tokens
-        self.transformer = None
+        self.transformer = SinkFormer(config)
 
     def forward(
         self: Self,
