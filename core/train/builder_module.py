@@ -11,5 +11,3 @@ class BuilderModule(L.LightningModule):
 
     def forward(self, x):
         return x
-    
-    

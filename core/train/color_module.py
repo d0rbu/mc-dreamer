@@ -59,7 +59,7 @@ class ColorModule(ElucidatedDiffusion):
     ) -> None:
         model = None  # TODO: use a huggingface conditional unet or something
 
-        super().__init__(model, img_size, **kwargs)
+        super().__init__(model, img_size, data_key="sample", ctrl_key="y_index", **kwargs)
 
         self.ctrl_emb = ControlEmbedder(config.hidden_size)
 

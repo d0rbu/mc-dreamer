@@ -60,7 +60,7 @@ class StructureModule(L.LightningModule):
         return self.model(x, y_indices)
 
     def training_step(self, batch, batch_idx):
-        target, y_indices = batch
+        target, y_indices = batch["sample"], batch["y_index"]
         target = target > 0  # solid structure
         target = target.view(-1, self.tubes_per_sample, self.tube_length)  # (B, Y, Z, X) -> (B, T, tube_length)
         # Shift target back by 1 to get input: (A, B, C) -> (<|BOS|>, A, B)

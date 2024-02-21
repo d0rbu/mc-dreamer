@@ -120,4 +120,7 @@ class WorldSampleDataset(Dataset):
         if self.transform is not None:
             sample = self.transform(sample)
 
-        return sample, y_index
+        return {
+            "sample": sample,
+            "y_index": y_index,
+        }
