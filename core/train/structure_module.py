@@ -56,15 +56,26 @@ class StructureModule(L.LightningModule):
         return self.model(x, y_indices)
 
     def training_step(self, batch, batch_idx):
-        target, y_indices = batch["sample"], batch["y_index"]
-        target = target > 0  # solid structure
-        target = target.view(-1, self.tubes_per_sample, self.tube_length)  # (B, Y, Z, X) -> (B, T, tube_length)
-        # Shift target back by 1 to get input: (A, B, C) -> (<|BOS|>, A, B)
-        # BOS token (encoded as a tube) at the start of every sequence
-        inputs = th.roll(target, shifts=1, dims=1)
-        inputs[:, 0, :] = self.special_token_tubes["BOS"]
+        sample, y_indices = batch["sample"], batch["y_index"]
+        prev_tube, next_tube = batch["prev_tube"], batch["next_tube"]
 
-        output = self(inputs, y_indices)  # (B, T, tube_length) -> (B, T, tube_length)
+        target = th.empty((sample.shape[0], self.tubes_per_sample + 1, self.tube_length), dtype=th.bool, device=sample.device)
+        target[:, :-1, :] = (sample > 0).view(-1, self.tubes_per_sample, self.tube_length)  # (B, Y, Z, X) -> (B, T, tube_length)
+
+        if next_tube is None:
+            target[:, -1, :] = self.special_token_tubes["EOS"]
+        else:
+            target[:, -1, :] = (next_tube > 0).view(-1, self.tube_length)  # (B, T, tube_length) -> (B, T + 1, tube_length)
+
+        # Shift target back by 1 to get input: (B, C, D, E) -> (A, B, C, D)
+        inputs = th.roll(target, shifts=1, dims=1)
+
+        if prev_tube is None:
+            inputs[:, 0, :] = self.special_token_tubes["BOS"]
+        else:
+            inputs[:, 0, :] = (prev_tube > 0).view(-1, self.tube_length)
+
+        output = self(inputs, y_indices)  # (B, T + 1, tube_length) -> (B, T + 1, tube_length)
         loss = self.loss_fn(output, target)
         return loss
 
