@@ -18,6 +18,7 @@ class StructureModule(L.LightningModule):
         tube_length: int = 8,
         config: SinkFormerConfig = SinkFormerConfig(),
         lr: float = 1e-3,
+        wd: float = 1e-3,
     ) -> None:
         super().__init__()
         # use autoregressive model to do sequence modelling on the structure
@@ -67,6 +68,9 @@ class StructureModule(L.LightningModule):
         else:
             target[:, -1, :] = (next_tube > 0).view(-1, self.tube_length)  # (B, T, tube_length) -> (B, T + 1, tube_length)
 
+        del sample, batch  # free up memory
+        th.cuda.empty_cache()
+
         # Shift target back by 1 to get input: (B, C, D, E) -> (A, B, C, D)
         inputs = th.roll(target, shifts=1, dims=1)
 
@@ -77,7 +81,8 @@ class StructureModule(L.LightningModule):
 
         output = self(inputs, y_indices)  # (B, T + 1, tube_length) -> (B, T + 1, tube_length)
         loss = self.loss_fn(output, target)
+
         return loss
 
     def configure_optimizers(self):
-        return L.optim.Adam(self.model.parameters(), lr=1e-3)
+        return th.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.wd)

@@ -20,8 +20,6 @@ class StructureTransformer(nn.Module):
 
         assert len(sample_size) == 3, f"sample_size must be of length 3"
 
-        NUM_SPECIAL_TOKENS = 3  # PAD, BOS, EOS
-
         self.sample_size = sample_size
         self.tube_length = tube_length
         self.total_sample_size = sample_size[0] * sample_size[1] * sample_size[2]
@@ -30,10 +28,14 @@ class StructureTransformer(nn.Module):
         assert self.total_sample_size % tube_length == 0, f"sample_size must be divisible by tube_length"
 
         self.num_tube_types = 1 << tube_length
-        self.num_token_types = self.num_tube_types + NUM_SPECIAL_TOKENS
+        self.num_token_types = self.num_tube_types + config.num_special_tokens
+
         # note: the below formulation only works for tubes of length up to 32
-        self.tube_to_idx = th.Tensor([1 << i for i in range(tube_length)]).int()  # (tube_length,)
-        self.idx_to_tube = generate_binary_mapping(self.num_tube_types, self.tube_length)  # (num_tube_types, tube_length)
+        tube_to_idx = th.Tensor([1 << i for i in range(tube_length)]).int()  # (tube_length,)
+        idx_to_tube = generate_binary_mapping(self.num_tube_types, self.tube_length)  # (num_tube_types, tube_length)
+
+        self.register_buffer("tube_to_idx", tube_to_idx)
+        self.register_buffer("idx_to_tube", idx_to_tube)
 
         self.tube_in_embedding = nn.Embedding(self.num_token_types, config.hidden_size)
         self.tube_out_embedding = nn.Linear(config.hidden_size, self.num_tube_types)
