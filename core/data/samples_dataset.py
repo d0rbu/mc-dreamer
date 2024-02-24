@@ -4,6 +4,7 @@ import torch as th
 from torch.utils.data import Dataset
 from pydantic import BaseModel
 from typing import Self, Callable, Sequence
+from enum import Enum
 from functools import cache
 
 
@@ -22,23 +23,31 @@ class DatasetMetadata(BaseModel):
     test: list[FileMetadata]
 
 
+class WorldSampleDatasetMode(Enum):
+    NORMAL = "normal"
+    STRUCTURE = "structure"
+    COLOR = "color"
+
+
 class WorldSampleDataset(Dataset):
     def __init__(
         self: Self,
         data_dir: str | os.PathLike,
         split: str = "train",
         sample_size: tuple[int, int, int] = (16, 16, 16),
-        metadata_file: str | os.PathLike = "metadata.json",
         tube_length: int | None = 8,
+        dataset_mode: WorldSampleDatasetMode = WorldSampleDatasetMode.NORMAL,
+        metadata_file: str | os.PathLike = "metadata.json",
         transform: Callable[[th.Tensor], th.Tensor] | None = None,
         device: th.device = th.device("cpu"),
     ) -> None:
         super().__init__()
         self.sample_size = sample_size
         self.sample_y_slice_size = (1, sample_size[1], sample_size[2])
+        self.tube_length = tube_length
+        self.dataset_mode = dataset_mode
         self.transform: Callable[[th.Tensor], th.Tensor] = transform if transform is not None else lambda x: x
         self.device = device
-        self.tube_length = tube_length
 
         assert os.path.isdir(data_dir), f"{data_dir} is not a directory"
 
@@ -125,6 +134,9 @@ class WorldSampleDataset(Dataset):
         data = self.data[data_index]
         sample_slice = self._get_slice(volume_index)
 
+        if self.dataset_mode != WorldSampleDatasetMode.STRUCTURE:
+            return self.transform(data[sample_slice]), volume_index[0].item(), None, None
+
         volume_below_index = (volume_index[0] - 1, volume_index[1], volume_index[2])
         volume_above_index = (volume_index[0] + 1, volume_index[1], volume_index[2])
 
@@ -149,9 +161,19 @@ class WorldSampleDataset(Dataset):
         file_index, sample_index = self._get_data_indices(index)
         sample, y_index, previous_tube, next_tube = self._get_sample(file_index, sample_index)
 
-        return {
-            "sample": sample,
-            "prev_tube": previous_tube,
-            "next_tube": next_tube,
-            "y_index": y_index,
-        }
+        if self.dataset_mode == WorldSampleDatasetMode.NORMAL:
+            return sample
+        elif self.dataset_mode == WorldSampleDatasetMode.STRUCTURE:
+            structure = sample > 0
+            prev_tube_structure = previous_tube > 0 if previous_tube is not None else None
+            next_tube_structure = next_tube > 0 if next_tube is not None else None
+
+            return structure, y_index, prev_tube_structure, next_tube_structure
+        elif self.dataset_mode == WorldSampleDatasetMode.COLOR:
+            return {
+                "sample": sample,
+                "control": {
+                    "structure": sample > 0,
+                    "y_index": y_index,
+                },
+            }

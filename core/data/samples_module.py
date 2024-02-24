@@ -3,7 +3,7 @@ import shutil
 import torch as th
 import lightning as L
 from core.extract import extract_world
-from core.data.samples_dataset import WorldSampleDataset
+from core.data.samples_dataset import WorldSampleDataset, WorldSampleDatasetMode
 from torch.utils.data import DataLoader
 from typing import Self
 
@@ -21,6 +21,8 @@ class WorldSampleDataModule(L.LightningDataModule):
     def __init__(
         self: Self,
         sample_size: tuple[int, int, int] = (16, 16, 16),
+        tube_length: int | None = 8,
+        dataset_mode: WorldSampleDatasetMode = WorldSampleDatasetMode.NORMAL,
         batch_size: int = 8,
         num_workers: int = 8,
         data_dir: str | os.PathLike = "outputs",
@@ -30,6 +32,7 @@ class WorldSampleDataModule(L.LightningDataModule):
     ) -> None:
         super().__init__()
         self.sample_size = sample_size
+        self.tube_length = tube_length
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.data_dir = data_dir
@@ -120,17 +123,15 @@ class WorldSampleDataModule(L.LightningDataModule):
                 data_dir = self.data_dir,
                 split = split,
                 sample_size = self.sample_size,
+                tube_length = self.tube_length,
+                dataset_mode = WorldSampleDatasetMode.NORMAL,
                 device = self.device,
             ))
 
-    def train_dataloader(self: Self) -> DataLoader:
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, num_workers=self.num_workers)
-
-    def val_dataloader(self: Self) -> DataLoader:
-        return DataLoader(self.val_dataset, batch_size=self.batch_size, num_workers=self.num_workers)
-
-    def test_dataloader(self: Self) -> DataLoader:
-        return DataLoader(self.test_dataset, batch_size=self.batch_size, num_workers=self.num_workers)
-
-    def predict_dataloader(self: Self) -> DataLoader:
-        return DataLoader(self.predict_dataset, batch_size=self.batch_size, num_workers=self.num_workers)
+            # sets self.train_dataloader, self.val_dataloader, self.test_dataloader, etc.
+            setattr(self, f"{split}_dataloader", DataLoader(
+                getattr(self, f"{split}_dataset"),
+                batch_size = self.batch_size,
+                shuffle = split == "train",
+                num_workers = self.num_workers,
+            ))

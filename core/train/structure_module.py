@@ -1,4 +1,3 @@
-import os
 import lightning as L
 import torch as th
 from typing import Self
@@ -22,7 +21,7 @@ class StructureModule(L.LightningModule):
     ) -> None:
         super().__init__()
         # use autoregressive model to do sequence modelling on the structure
-        # break into tubes of voxels (does not necessarily span the entire sample). tube_length = 1 for voxel-level prediction
+        # break into tubes of voxels (does not necessarily span the entire sample length). tube_length = 1 for voxel-level prediction
 
         self.sample_size = sample_size
         self.tube_length = tube_length
@@ -57,27 +56,29 @@ class StructureModule(L.LightningModule):
         return self.model(x, y_indices)
 
     def training_step(self, batch, batch_idx):
-        sample, y_indices = batch["sample"], batch["y_index"]
-        prev_tube, next_tube = batch["prev_tube"], batch["next_tube"]
-
-        target = th.empty((sample.shape[0], self.tubes_per_sample + 1, self.tube_length), dtype=th.bool, device=sample.device)
-        target[:, :-1, :] = (sample > 0).view(-1, self.tubes_per_sample, self.tube_length)  # (B, Y, Z, X) -> (B, T, tube_length)
+        structure, y_indices, prev_tube, next_tube = batch
+        batch_size = structure.shape[0]
 
         if next_tube is None:
-            target[:, -1, :] = self.special_token_tubes["EOS"]
+            next_tube = self.special_token_tubes["EOS"]
         else:
-            target[:, -1, :] = (next_tube > 0).view(-1, self.tube_length)  # (B, T, tube_length) -> (B, T + 1, tube_length)
+            next_tube = next_tube.expand(batch_size, 1, self.tube_length)  # (tube_length,) -> (B, 1, tube_length)
 
-        del sample, batch  # free up memory
+        target = th.cat((structure.view(batch_size, self.tubes_per_sample, self.tube_length), next_tube), dim=1)  # (B, Y, Z, X) -> (B, T + 1, tube_length)
+
+        del structure, batch, next_tube  # free up memory
         th.cuda.empty_cache()
 
         # Shift target back by 1 to get input: (B, C, D, E) -> (A, B, C, D)
         inputs = th.roll(target, shifts=1, dims=1)
 
         if prev_tube is None:
-            inputs[:, 0, :] = self.special_token_tubes["BOS"]
+            inputs[:, 0] = self.special_token_tubes["BOS"]
         else:
-            inputs[:, 0, :] = (prev_tube > 0).view(-1, self.tube_length)
+            inputs[:, 0] = prev_tube.view(-1, self.tube_length)
+
+        del prev_tube
+        th.cuda.empty_cache()
 
         output = self(inputs, y_indices)  # (B, T + 1, tube_length) -> (B, T + 1, tube_length)
         loss = self.loss_fn(output, target)
