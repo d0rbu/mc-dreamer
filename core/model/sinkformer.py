@@ -1,6 +1,7 @@
 import torch as th
 import torch.nn as nn
 from transformers.models.llama.modeling_llama import LlamaConfig, LlamaModel
+from transformers.cache_utils import DynamicCache
 from typing import Self
 
 
@@ -60,11 +61,12 @@ class SinkFormer(LlamaModel):
             position_ids = th.arange(inputs_embeds.shape[1], device=inputs_embeds.device).unsqueeze(0)
             position_ids += start_pos_indices
 
-        if past_key_values is None:
-            past_key_values = [[] * self.config.num_hidden_layers]
-
-        for layer_idx, layer_past_key_values in enumerate(past_key_values):
-            layer_past_key_values = th.cat([self.sink_key_values[layer_idx], layer_past_key_values], dim=0)
+        # set up initial sink key values
+        if past_key_values is None or \
+                (isinstance(past_key_values, list) and len(past_key_values[0]) == 0) or \
+                (isinstance(past_key_values, DynamicCache) and past_key_values.seen_tokens == 0):
+            past_key_values = [[self.sink_key_values[layer_idx]] for layer_idx in range(self.config.num_hidden_layers)] 
+            past_key_values = DynamicCache.from_legacy_cache(past_key_values)
 
         return super().forward(
             attention_mask=attention_mask,
