@@ -14,16 +14,8 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 I would recommend installing the [Python Environment Manager](https://marketplace.visualstudio.com/items?itemName=donjayamanne.python-environment-manager) extension in VSCode, as it will automatically recognize the environment and set it as the default.
-### Java Environment
-Make sure you have a JDK installed. If you do not, you can download one [here](https://www.oracle.com/java/technologies/downloads/). Make sure to add it to your PATH.
-
-Then, you want to make sure you have Apache Maven set up and [Enklume](https://github.com/Hugobros3/Enklume) added to your local Maven repository. Here is a Maven [download link](https://maven.apache.org/download.cgi) and instructions for [Mac/Linux](https://maven.apache.org/install.html) and [Windows](https://maven.apache.org/guides/getting-started/windows-prerequisites.html).
-
-To add Enklume to your local repository, clone the repository and run `gradlew install` in the root directory. If that does not work, try `gradlew publishToMavenLocal` instead. Then you should have it installed and not get any errors when importing it in the project.
-
-I use IntelliJ IDEA for Java development, so I would recommend using that to open the `java` folder.
 ### Web Scraping
-If you want to do web scraping, there is a little more setup to do. Create a `.env` file in the project directory and fill it out as follows:
+If you want to do web scraping (very likely not, you would need a very good reason to), there is a little more setup to do. Create a `.env` file in the project directory and fill it out as follows:
 ```sh
 PMC_EMAIL=<Planet Minecraft Email>
 PMC_PASSWORD=<Planet Minecraft Password>
