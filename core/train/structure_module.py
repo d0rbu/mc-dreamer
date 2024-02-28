@@ -1,4 +1,5 @@
 import math
+import yaml
 import lightning as L
 import torch as th
 from typing import Self
@@ -11,8 +12,32 @@ class StructureModule(L.LightningModule):
     """
     Module for autoregressive structure prediction.
     """
+    
+    DEFAULTS = {
+    }
 
-    # TODO: add from_conf classmethod
+    @classmethod
+    def from_conf(
+        cls: type[Self],
+        path: str,
+        **kwargs,
+    ) -> Self:
+        with open(path, "r") as f:
+            conf = yaml.safe_load(f)
+
+        # Store the configuration file
+        cls.conf = conf
+
+        net_par = cls.DEFAULTS.copy()
+        net_par.update(conf["MODEL"])
+        net_par = SinkFormerConfig(**net_par)
+        lr_par = conf["LR"]
+
+        # Grab the batch size for precise metric logging
+        cls.batch_size = conf["DATASET"]["batch_size"]
+
+        return cls(config = net_par, **lr_par, **kwargs)
+
     def __init__(
         self: Self,
         sample_size: tuple[int, int, int] = (16, 16, 16),
@@ -98,7 +123,7 @@ class StructureModule(L.LightningModule):
 
         return loss
 
-    def configure_optimizers(self):  # TODO: add scheduler
+    def configure_optimizers(self):
         optimizer = th.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.wd)
         scheduler = th.optim.lr_scheduler.SequentialLR(optimizer, [
             th.optim.lr_scheduler.LinearLR(optimizer, start_factor=0.0, total_iters=self.warmup_steps),

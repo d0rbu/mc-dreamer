@@ -109,11 +109,26 @@ class ColorModule(BitDiffusion):
     Module for color prediction.
     """
     
-    DEFAULTS = {
+    NET_DEFAULTS = {
         "num_bits": 8,
         "img_size": (16, 16, 16),
         "data_key": "sample",
         "ctrl_key": "control",
+    }
+    OPT_DEFAULTS = {
+        "lr": 1e-3,
+        "weight_decay": 1e-3,
+        "warmup_steps": 10000,
+    }
+    LR_DEFAULTS = {
+        "warmup_steps": 10000,
+        "restart_interval": 10000,
+        "lr_decay": 0.9,
+        "min_lr": 1e-5,
+        "plateau_patience": 10000,
+        "plateau_factor": 0.5,
+        "plateau_metric": "val_loss",
+        "plateau_mode": "min",
     }
 
     @classmethod
@@ -131,8 +146,15 @@ class ColorModule(BitDiffusion):
 
         # Store the configuration file
         cls.conf = conf
+        opt_conf = cls.OPT_DEFAULTS.copy()
+        opt_conf.update(conf["OPTIMIZER"])
+        lr_conf = cls.LR_DEFAULTS.copy()
+        lr_conf.update(conf["LR"])
 
-        net_par = cls.DEFAULTS.copy()
+        cls.conf["OPTIMIZER"] = opt_conf
+        cls.conf["LR"] = lr_conf
+
+        net_par = cls.NET_DEFAULTS.copy()
         net_par.update(conf["MODEL"])
         dif_par = conf["DIFFUSION"]
 
@@ -210,7 +232,25 @@ class ColorModule(BitDiffusion):
         loss *= self.loss_weight(sig)
         return loss.mean()
 
-    # TODO: add lr scheduler to config optimizers
     @override
-    def configure_optimizers(self) -> list:
-        return [th.optim.AdamW(self.parameters(), lr = self.lr, weight_decay = self.wd)]
+    def configure_optimizers(self) -> tuple[list]:
+        optim_conf = self.conf["OPTIMIZER"]
+
+        optimizer = super().configure_optimizers()
+        scheduler = th.optim.lr_scheduler.SequentialLR(optimizer, [
+            th.optim.lr_scheduler.LinearLR(optimizer, start_factor=0.0, total_iters=optim_conf["warmup_steps"]),
+            th.optim.lr_scheduler.ChainedScheduler([
+                th.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=optim_conf["restart_interval"], T_mult=2, eta_min=optim_conf["min_lr"]),
+                th.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda step: optim_conf["lr_decay"] ** (math.floor(math.log2(step/self.restart_interval + 1)))),
+                th.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode=optim_conf["plateau_mode"], factor=optim_conf["plateau_factor"], patience=optim_conf["plateau_patience"], min_lr=optim_conf["min_lr"]),
+            ])
+        ], milestones=[optim_conf["warmup_steps"]])
+
+        scheduler_config = {
+            "scheduler": scheduler,
+            "interval": "step",
+            "frequency": 1,
+            "monitor": optim_conf["plateau_metric"],
+        }
+
+        return [optimizer], [scheduler_config]
