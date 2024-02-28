@@ -50,6 +50,7 @@ class StructureModule(L.LightningModule):
         lr_decay: float = 0.9,
         min_lr: float = 1e-5,
         plateau_patience: int = 10000,
+        plateau_metric: str = "val_loss",
     ) -> None:
         super().__init__()
         # use autoregressive model to do sequence modelling on the structure
@@ -77,6 +78,7 @@ class StructureModule(L.LightningModule):
         self.lr_decay = lr_decay
         self.min_lr = min_lr
         self.plateau_patience = plateau_patience
+        self.plateau_metric = plateau_metric
         self.loss_fn = th.nn.CrossEntropyLoss()
 
     def _generate_special_token_tubes(
@@ -138,7 +140,7 @@ class StructureModule(L.LightningModule):
             "scheduler": scheduler,
             "interval": "step",
             "frequency": 1,
-            "monitor": "val_loss",
+            "monitor": self.plateau_metric,
         }
 
         return [optimizer], [scheduler_config]

@@ -1,93 +1,19 @@
 import torch.nn as nn
-from torch import Tensor
-from torch.nn.functional import interpolate
 
-from modular_diffustion.diffusion.module.components import LinRes
-from modular_diffustion.diffusion.module.components import ConvRes
 from modular_diffustion.diffusion.module.components import ConvTimeRes
+from modular_diffustion.module.utils.misc import default
 
-from ..utils.misc import default
-from ..utils.misc import enlarge_as
+from typing import Optional
 
-from typing import List, Optional
-
-def Upsample(dim_in, dim_out = None):
+def Upsample3D(dim_in, dim_out = None):
     return nn.Sequential(
         nn.Upsample(scale_factor = 2, mode = 'nearest'),
         nn.Conv3d(dim_in, default(dim_out, dim_in), 3, padding = 1)
     )
 
-def Downsample(dim_in, dim_out = None):
+def Downsample3D(dim_in, dim_out = None):
     return nn.Conv3d(dim_in, default(dim_out, dim_in), 4, 2, 1)
 
-class LinRes(LinRes):
-    '''
-        Linear Residual Block. It is composed of two
-        linear layers and outputs the addition of the
-        output of those layers with the residual path
-    '''
-
-    def __init__(
-        self,
-        inp_dim : int,
-        hid_dim : int,
-        dropout : float = 0.   
-    ) -> None:
-        super().__init__()
-
-        self.seq = nn.Sequential(
-            nn.Linear(inp_dim, hid_dim),
-            nn.ReLU(inplace = True),
-            nn.Dropout(dropout),
-            nn.Linear(hid_dim, inp_dim),
-            nn.Dropout(dropout),
-        )
-
-        self.norm = nn.LayerNorm(inp_dim)
-
-    def forward(self, inp : Tensor) -> Tensor:
-        out = inp + self.seq(inp)
-
-        return self.norm(out)
-
-class ConvRes3D(ConvRes):
-    '''
-        Convolutional Residual Block. It is composed of two
-        convolutional layers and output the addition of the
-        output of those convolutions with the residual path
-    '''
-
-    def __init__(
-        self,
-        inp_chn : int,
-        out_chn : Optional[int] = None,
-        hid_chn : Optional[int] = None,
-
-        stride : int = 1,
-    ) -> None:
-        super().__init__()
-
-        out_chn = default(out_chn, inp_chn)
-        hid_chn = default(hid_chn, out_chn)
-
-        self.seq = nn.Sequential(
-            nn.Conv3d(inp_chn, hid_chn, kernel_size = 1, bias = False),
-            nn.BatchNorm3d(hid_chn),
-            nn.ReLU(inplace = True),
-            nn.Conv3d(hid_chn, out_chn, kernel_size = 3, padding = 1, stride = stride, bias = False),
-            nn.BatchNorm3d(out_chn),
-        )
-
-        proj_ker = 1 if stride == 1 else 3
-        self.proj = nn.Conv3d(inp_chn, out_chn, proj_ker, padding = 1, stride = stride)
-
-        self.actv = nn.ReLU(inplace = True)
-
-    def forward(self, inp : Tensor) -> Tensor:
-        out = self.proj(inp) + self.seq(inp)
-
-        return self.actv(out)
-    
 class ConvTimeRes3D(ConvTimeRes):
     '''
         Convolutional Residual Block with time embedding
@@ -105,7 +31,8 @@ class ConvTimeRes3D(ConvTimeRes):
         ctx_dim : Optional[int] = None,
         num_group : int = 8,
     ) -> None:
-        super().__init__()
+        # Skip ConvTimeRes init
+        super(nn.Module, self).__init__()
 
         out_dim = default(out_dim, inp_dim)
         hid_dim = default(hid_dim, out_dim)
@@ -129,21 +56,3 @@ class ConvTimeRes3D(ConvTimeRes):
         )
 
         self.skip = nn.Conv3d(inp_dim, out_dim, 1) if inp_dim != out_dim else nn.Identity()
-
-    '''def forward(
-        self,
-        inps : Tensor,
-        time : Tensor,
-    ) -> Tensor:
-        
-        # Perform first convolution block
-        h = self.conv1(inps)
-
-        # Add embedded time signal with appropriate
-        # broadcasting to match image-like tensors
-        time = self.time_emb(time)
-        h += enlarge_as(time, h)
-
-        h = self.conv2(h)
-
-        return self.skip(inps) + h'''

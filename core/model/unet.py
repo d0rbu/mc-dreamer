@@ -1,19 +1,11 @@
 import torch as th
 import torch.nn as nn
 
-from model.components.adapter import ConvAdapter
-from model.components.adapter import ConvLinearAdapter
-from model.components.convolution import Upsample
-from model.components.convolution import Downsample
-from model.components.convolution import ConvTimeRes3D
-
-from modular_diffusiuon.diffusion.module.unet import UNet
-from modular_diffustion.module.components.embedding import TimeEmbedding
-from modular_diffustion.module.components.attention import EfficientAttention
-
-from modular_diffustion.module.utils.misc import exists
-from modular_diffustion.module.utils.misc import default
-from typing import Callable, Optional, override, Self, List
+from model.components.adapter import ConvAdapter, ConvLinearAdapter
+from model.components.convolution import Upsample3D, Downsample3D, ConvTimeRes3D
+from modular_diffustion.module.components.embedding import TimeEmbedding, EfficientAttention
+from modular_diffustion.module.utils.misc import exists, default
+from typing import Optional, Self, List
 
 class Unet3D(Unet):
     '''
@@ -23,7 +15,7 @@ class Unet3D(Unet):
     '''
 
     def __init__(
-        self,
+        self: Self,
         net_dim : int = 4,
         out_dim : Optional[int] = None,
         attn_dim : int = 128,
@@ -35,15 +27,15 @@ class Unet3D(Unet):
         qry_chunk : int = 512,
         key_chunk : int = 1024,
     ) -> None:
-        super().__init__()
+        super(nn.Module, self).__init__()
 
         out_dim = default(out_dim, channels)
 
         self.channels = channels
 
         # NOTE: We need channels * 2 to accomodate for the self-conditioning
-        self.proj_inp = nn.Conv3d(self.channels * 2, net_dim, kernel_size=(3, 3, 3), padding=(1, 1, 1))
-        # self.proj_inp = nn.Conv2d(self.channels, net_dim, 7, padding = 3)
+        self.proj_inp = nn.Conv3d(self.channels * 2, net_dim, kernel_size=7, padding=3)
+        # self.proj_inp = nn.Conv3d(self.channels, net_dim, kernel_size=7, padding=3)
 
         dims = [net_dim, *map(lambda m: net_dim * m, chn_mult)]
         mid_dim = dims[-1]
@@ -84,7 +76,7 @@ class Unet3D(Unet):
                 ConvTimeRes3D(dim_in, dim_in, ctx_dim = ctx_dim, num_group = num_group),
                 ConvTimeRes3D(dim_in, dim_in, ctx_dim = ctx_dim, num_group = num_group),
                 EfficientAttention(dim_in, attn_dim, qkv_adapt = qkv_adapt, key_dim = ctrl_dim, **attn_kw),
-                nn.Conv3d(dim_in, dim_out, kernel_size=(3, 3, 3), padding=(1, 1, 1)) if is_last else Downsample(dim_in, dim_out)  # Adjust Downsample for 3D
+                nn.Conv3d(dim_in, dim_out, kernel_size = 3, padding = 1) if is_last else Downsample3D(dim_in, dim_out)
             ]))
 
         # Buildup the bottleneck module
@@ -101,8 +93,7 @@ class Unet3D(Unet):
                 ConvTimeRes3D(dim_in + dim_out, dim_out, ctx_dim = ctx_dim, num_group = num_group),
                 ConvTimeRes3D(dim_in + dim_out, dim_out, ctx_dim = ctx_dim, num_group = num_group),
                 EfficientAttention(dim_out, attn_dim, qkv_adapt = qkv_adapt, key_dim = ctrl_dim, **attn_kw),
-                #nn.Conv2d(dim_out, dim_in, 3, padding = 1) if is_last else Upsample(dim_out, dim_in)
-                nn.ConvTranspose3d(dim_out, dim_in, kernel_size=(2, 2, 2), stride=(2, 2, 2)) # May be broken ----------------------------------------------------------------
+                nn.Conv3d(dim_out, dim_in, 3, padding = 1) if is_last else Upsample3D(dim_out, dim_in)
             ]))
 
         self.final = ConvTimeRes3D(net_dim * 2, net_dim, ctx_dim = ctx_dim, num_group = num_group)
