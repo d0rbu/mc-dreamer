@@ -1,7 +1,7 @@
 import torch.nn as nn
 
-from modular_diffustion.diffusion.module.components import ConvTimeRes
-from modular_diffustion.module.utils.misc import default
+from modular_diffusion.diffusion.module.components.convolution import ConvTimeRes
+from modular_diffusion.diffusion.module.utils.misc import default
 
 from typing import Optional
 

@@ -1,13 +1,15 @@
 import torch as th
 import torch.nn as nn
 
-from model.components.adapter import ConvAdapter, ConvLinearAdapter
-from model.components.convolution import Upsample3D, Downsample3D, ConvTimeRes3D
-from modular_diffustion.module.components.embedding import TimeEmbedding, EfficientAttention
-from modular_diffustion.module.utils.misc import exists, default
+from core.model.components.adapter import ConvAdapter, ConvLinearAdapter
+from core.model.components.convolution import Upsample3D, Downsample3D, ConvTimeRes3D
+from modular_diffusion.diffusion.module.components.embedding import TimeEmbedding
+from modular_diffusion.diffusion.module.components.attention import EfficientAttention
+from modular_diffusion.diffusion.module.unet import UNet
+from modular_diffusion.diffusion.module.utils.misc import exists, default
 from typing import Optional, Self, List
 
-class Unet3D(Unet):
+class Unet3D(UNet):
     '''
         U-Net model as introduced in:
         "U-Net: Convolutional Networks for Biomedical Image Segmentation".

@@ -4,11 +4,11 @@ import lightning as L
 import torch as th
 import torch.nn as nn
 from modular_diffusion.diffusion.discrete import BitDiffusion
-from modular_diffusion.module.utils.misc import default, exists, enlarge_as
+from modular_diffusion.diffusion.module.utils.misc import default, exists, enlarge_as
 from einops import reduce
 from random import random
 from core.model.unet import Unet3D
-from typing import Callable, Optional, override, Self
+from typing import Callable, Optional, Self, overload
 
 
 # vaswani et al 2017
@@ -175,7 +175,7 @@ class ColorModule(BitDiffusion):
 
         self.ctrl_emb = ControlEmbedder(ctrl_dim)
 
-    @override
+    @overload
     def criterion(self) -> Callable:
         return th.nn.CrossEntropyLoss()  # CE for classification instead of regression
 
@@ -232,7 +232,7 @@ class ColorModule(BitDiffusion):
         loss *= self.loss_weight(sig)
         return loss.mean()
 
-    @override
+    @overload
     def configure_optimizers(self) -> tuple[list]:
         optim_conf = self.conf["OPTIMIZER"]
 

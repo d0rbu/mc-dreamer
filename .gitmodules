@@ -1,6 +1,6 @@
 [submodule "anvil"]
 	path = anvil
 	url = https://github.com/d0rbu/anvil-compat
-[submodule "modular-diffusion"]
-	path = modular-diffusion
+[submodule "modular_diffusion"]
+	path = modular_diffusion
 	url = git@github.com:d0rbu/modular-diffusion.git

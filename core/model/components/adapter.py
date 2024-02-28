@@ -1,6 +1,6 @@
 import torch.nn as nn
-from modular_diffustion.module.utils.misc import default
-from modular_diffustion.module.components.adapter import ConvAdapter, ConvLinearAdapter
+from modular_diffusion.diffusion.module.utils.misc import default
+from modular_diffusion.diffusion.module.components.adapter import ConvAdapter, ConvLinearAdapter
 from typing import Optional
 
 class ConvLinearAdapter3D(ConvLinearAdapter):
