@@ -1,8 +1,13 @@
 import math
+import yaml
 import lightning as L
 import torch as th
 import torch.nn as nn
 from modular_diffusion.diffusion.discrete import BitDiffusion
+from modular_diffusion.module.utils.misc import default, exists, enlarge_as
+from einops import reduce
+from random import random
+from core.model.unet import Unet3D
 from typing import Callable, Optional, override, Self
 
 
@@ -103,21 +108,97 @@ class ColorModule(BitDiffusion):
     """
     Module for color prediction.
     """
+    
+    DEFAULTS = {
+        "num_bits": 8,
+        "img_size": (16, 16, 16),
+        "data_key": "sample",
+        "ctrl_key": "control",
+    }
+
+    @classmethod
+    def from_conf(
+        cls: type[Self],
+        path: str,
+    ) -> Self:
+        '''
+            Initialize the Diffusion model from a YAML configuration file.
+        '''
+
+        with open(path, 'r') as f:
+            conf = yaml.safe_load(f)
+
+        # Store the configuration file
+        cls.conf = conf
+
+        net_par = cls.DEFAULTS.copy()
+        net_par.update(conf["MODEL"])
+        dif_par = conf["DIFFUSION"]
+
+        # Grab the batch size for precise metric logging
+        cls.batch_size = conf["DATASET"]["batch_size"]
+
+        # Initialize the network
+        net = Unet3D(**net_par)
+
+        return cls(net, ctrl_dim = net_par["ctrl_dim"], **dif_par)
 
     def __init__(
         self: Self,
-        sample_size: int = (16, 16, 16),
-        config = None,  # TODO: use hf config for whatever model we use
+        ctrl_dim: int,
         **kwargs,
     ) -> None:
-        model = None  # TODO: use a huggingface conditional unet or something compatible with modular-diffusion
+        super().__init__(**kwargs)
 
-        super().__init__(model, num_bits=8, img_size=sample_size, data_key="sample", ctrl_key="control", **kwargs)
-
-        self.ctrl_emb = ControlEmbedder(config.hidden_size)
+        self.ctrl_emb = ControlEmbedder(ctrl_dim)
 
     @override
     def criterion(self) -> Callable:
         return th.nn.CrossEntropyLoss()  # CE for classification instead of regression
 
     # TODO: override loss function to apply criterion over structure instead of the whole sample
+    def compute_loss(
+        self: Self,
+        x_0 : th.Tensor,
+        ctrl : Optional[th.Tensor] = None,
+        use_x_c : Optional[bool] = None,     
+        norm_fn : Optional[Callable] = None,
+    ) -> th.Tensor:
+        use_x_c = default(use_x_c, self.self_cond)
+        norm_fn = default(norm_fn, self.norm_forward)
+
+        # Encode the condition using the sequence encoder
+        ctrl = self.ctrl_emb(ctrl) if exists(ctrl) else ctrl
+
+        # Normalize input images
+        x_0 = norm_fn(x_0)
+
+        bs, *_ = x_0.shape
+
+        # Get the noise and scaling schedules
+        sig = self.get_noise(bs)
+
+        # NOTE: What to do with the scaling if present?
+        # scales = self.get_scaling()
+
+        eps = th.randn_like(x_0)
+        x_t = x_0 + enlarge_as(sig, x_0) * eps # NOTE: Need to consider scaling here!
+
+        x_c = None
+
+        # Use self-conditioning with 50% dropout
+        if use_x_c and random() < 0.5:
+            with th.no_grad():
+                x_c = self.predict(x_t, sig, ctrl = ctrl)
+                x_c.detach_()
+
+        x_p = self.predict(x_t, sig, x_c = x_c, ctrl = ctrl)
+
+        # Compute the reconstruction loss
+        # TODO: Remove loss for air blocks?? (Find air blocks in x_0 and add a mask to it)
+        loss = self.criterion(x_p, x_0, reduction = 'none')
+        loss: th.Tensor = reduce(loss, 'b ... -> b', 'mean')
+
+        # Add loss weight
+        loss *= self.loss_weight(sig)
+        return loss.mean()
