@@ -1,3 +1,4 @@
+import math
 import lightning as L
 import torch as th
 from typing import Self
@@ -19,6 +20,11 @@ class StructureModule(L.LightningModule):
         config: SinkFormerConfig = SinkFormerConfig(),
         lr: float = 1e-3,
         wd: float = 1e-3,
+        warmup_steps: int = 10000,
+        restart_interval: int = 10000,
+        lr_decay: float = 0.9,
+        min_lr: float = 1e-5,
+        plateau_patience: int = 10000,
     ) -> None:
         super().__init__()
         # use autoregressive model to do sequence modelling on the structure
@@ -40,6 +46,12 @@ class StructureModule(L.LightningModule):
             config=config,
         )
         self.lr = lr
+        self.wd = wd
+        self.warmup_steps = warmup_steps
+        self.restart_interval = restart_interval
+        self.lr_decay = lr_decay
+        self.min_lr = min_lr
+        self.plateau_patience = plateau_patience
         self.loss_fn = th.nn.CrossEntropyLoss()
 
     def _generate_special_token_tubes(
@@ -87,4 +99,21 @@ class StructureModule(L.LightningModule):
         return loss
 
     def configure_optimizers(self):  # TODO: add scheduler
-        return th.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.wd)
+        optimizer = th.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.wd)
+        scheduler = th.optim.lr_scheduler.SequentialLR(optimizer, [
+            th.optim.lr_scheduler.LinearLR(optimizer, start_factor=0.0, total_iters=self.warmup_steps),
+            th.optim.lr_scheduler.ChainedScheduler([
+                th.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=self.restart_interval, T_mult=2, eta_min=self.min_lr),
+                th.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda step: self.lr_decay ** (math.floor(math.log2(step/self.restart_interval + 1)))),
+                th.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=self.plateau_patience, min_lr=self.min_lr),
+            ])
+        ], milestones=[self.warmup_steps])
+
+        scheduler_config = {
+            "scheduler": scheduler,
+            "interval": "step",
+            "frequency": 1,
+            "monitor": "val_loss",
+        }
+
+        return [optimizer], [scheduler_config]

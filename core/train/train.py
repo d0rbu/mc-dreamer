@@ -43,5 +43,3 @@ if __name__ == "__main__":
     trainer = Trainer()
 
     trainer.fit(model, datamodule=data_module, ckpt_path=args.ckpt_dir)
-
-    print("Done :)")

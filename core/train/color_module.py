@@ -157,7 +157,6 @@ class ColorModule(BitDiffusion):
     def criterion(self) -> Callable:
         return th.nn.CrossEntropyLoss()  # CE for classification instead of regression
 
-    # TODO: override loss function to apply criterion over structure instead of the whole sample
     def compute_loss(
         self: Self,
         x_0 : th.Tensor,
@@ -212,3 +211,6 @@ class ColorModule(BitDiffusion):
         return loss.mean()
 
     # TODO: add lr scheduler to config optimizers
+    @override
+    def configure_optimizers(self) -> list:
+        return [th.optim.AdamW(self.parameters(), lr = self.lr, weight_decay = self.wd)]
