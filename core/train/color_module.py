@@ -21,7 +21,7 @@ class PositionalEmbeddings(nn.Module):
         positional_embeddings = th.zeros(max_len, 1, d_model)
         positional_embeddings[:, 0, 0::2] = th.sin(position * div_term)
         positional_embeddings[:, 0, 1::2] = th.cos(position * div_term)
-        self.register_buffer('positional_embeddings', positional_embeddings)
+        self.register_buffer("positional_embeddings", positional_embeddings)
 
     def forward(self, positions: th.Tensor):
         """
@@ -125,7 +125,7 @@ class ColorModule(BitDiffusion):
             Initialize the Diffusion model from a YAML configuration file.
         '''
 
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             conf = yaml.safe_load(f)
 
         # Store the configuration file
@@ -170,6 +170,9 @@ class ColorModule(BitDiffusion):
         # Encode the condition using the sequence encoder
         ctrl = self.ctrl_emb(ctrl) if exists(ctrl) else ctrl
 
+        # Extract the structure from the control
+        structures = ctrl["structure"]
+
         # Normalize input images
         x_0 = norm_fn(x_0)
 
@@ -194,10 +197,14 @@ class ColorModule(BitDiffusion):
 
         x_p = self.predict(x_t, sig, x_c = x_c, ctrl = ctrl)
 
-        # Compute the reconstruction loss
-        # TODO: Remove loss for air blocks?? (Find air blocks in x_0 and add a mask to it)
-        loss = self.criterion(x_p, x_0, reduction = 'none')
-        loss: th.Tensor = reduce(loss, 'b ... -> b', 'mean')
+        # Compute the distribution loss ONLY for blocks that are solid in the structures
+        solid_masks = [structure > 0 for structure in structures]
+
+        loss = self.criterion(x_p, x_0, reduction = "none")
+        device = loss.device
+
+        # Compute the mean loss of each batch according to solid blocks
+        loss = th.tensor([loss[i][mask].mean() for i, mask in enumerate(solid_masks)], device = device)
 
         # Add loss weight
         loss *= self.loss_weight(sig)
