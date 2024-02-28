@@ -4,7 +4,7 @@ import torch as th
 from torch.utils.data import Dataset
 from pydantic import BaseModel
 from typing import Self, Callable, Sequence
-from enum import Enum
+from enum import StrEnum
 from functools import cache
 
 
@@ -23,7 +23,7 @@ class DatasetMetadata(BaseModel):
     test: list[FileMetadata]
 
 
-class WorldSampleDatasetMode(Enum):
+class WorldSampleDatasetMode(StrEnum):
     NORMAL = "normal"
     STRUCTURE = "structure"
     COLOR = "color"

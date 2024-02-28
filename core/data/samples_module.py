@@ -33,6 +33,7 @@ class WorldSampleDataModule(L.LightningDataModule):
         super().__init__()
         self.sample_size = sample_size
         self.tube_length = tube_length
+        self.dataset_mode = dataset_mode
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.data_dir = data_dir
@@ -124,7 +125,7 @@ class WorldSampleDataModule(L.LightningDataModule):
                 split = split,
                 sample_size = self.sample_size,
                 tube_length = self.tube_length,
-                dataset_mode = WorldSampleDatasetMode.NORMAL,
+                dataset_mode = self.dataset_mode,
                 device = self.device,
             ))
 

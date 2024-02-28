@@ -120,6 +120,7 @@ class ColorModule(BitDiffusion):
     def from_conf(
         cls: type[Self],
         path: str,
+        **kwargs,
     ) -> Self:
         '''
             Initialize the Diffusion model from a YAML configuration file.
@@ -141,7 +142,7 @@ class ColorModule(BitDiffusion):
         # Initialize the network
         net = Unet3D(**net_par)
 
-        return cls(net, ctrl_dim = net_par["ctrl_dim"], **dif_par)
+        return cls(net, ctrl_dim = net_par["ctrl_dim"], **kwargs, **dif_par)
 
     def __init__(
         self: Self,
@@ -209,3 +210,5 @@ class ColorModule(BitDiffusion):
         # Add loss weight
         loss *= self.loss_weight(sig)
         return loss.mean()
+
+    # TODO: add lr scheduler to config optimizers

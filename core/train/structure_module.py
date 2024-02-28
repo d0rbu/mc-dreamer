@@ -11,6 +11,7 @@ class StructureModule(L.LightningModule):
     Module for autoregressive structure prediction.
     """
 
+    # TODO: add from_conf classmethod
     def __init__(
         self: Self,
         sample_size: tuple[int, int, int] = (16, 16, 16),
@@ -85,5 +86,5 @@ class StructureModule(L.LightningModule):
 
         return loss
 
-    def configure_optimizers(self):
+    def configure_optimizers(self):  # TODO: add scheduler
         return th.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.wd)
