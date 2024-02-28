@@ -117,8 +117,8 @@ class WorldSampleDataset(Dataset):
     
     def _get_slice(
         self: Self,
-        volume_index: Sequence[int, int, int],
-        sample_size: Sequence[int, int, int] | None = None
+        volume_index: tuple[int, int, int],
+        sample_size: tuple[int, int, int] | None = None
     ) -> tuple[slice, slice, slice]:
         if sample_size is None:
             sample_size = self.sample_size

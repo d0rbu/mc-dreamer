@@ -3,4 +3,4 @@
 	url = https://github.com/d0rbu/anvil-compat
 [submodule "modular-diffusion"]
 	path = modular-diffusion
-	url = git@github.com:myscience/modular-diffusion.git
+	url = git@github.com:d0rbu/modular-diffusion.git
