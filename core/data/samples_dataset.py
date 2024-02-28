@@ -104,6 +104,8 @@ class WorldSampleDataset(Dataset):
             f"does not match sum of sample sizes ({sum(self.sample_sizes)})"
         )
 
+        print(f"Loaded {len(self.data)} files for {split} set with {self.num_samples} samples")
+
     @cache
     def _get_data_indices(self: Self, sample_index: int) -> tuple[int, int]:
         # return index of file and index of sample within file
