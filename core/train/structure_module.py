@@ -31,13 +31,14 @@ class StructureModule(L.LightningModule):
         net_par = cls.DEFAULTS.copy()
         net_par.update(conf["MODEL"])
         net_par = SinkFormerConfig(**net_par)
-        lr_par = conf["LR"]
+        optim_par = conf["OPTIMIZER"]
 
         # Grab the batch size for precise metric logging
         cls.batch_size = conf["DATASET"]["batch_size"]
 
-        return cls(config = net_par, **lr_par, **kwargs)
+        kwargs.update(optim_par)
 
+        return cls(config = net_par, **kwargs)
     def __init__(
         self: Self,
         sample_size: tuple[int, int, int] = (16, 16, 16),
@@ -51,6 +52,7 @@ class StructureModule(L.LightningModule):
         min_lr: float = 1e-5,
         plateau_patience: int = 10000,
         plateau_metric: str = "val_loss",
+        **kwargs: dict,
     ) -> None:
         super().__init__()
         # use autoregressive model to do sequence modelling on the structure

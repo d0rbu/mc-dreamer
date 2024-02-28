@@ -1,0 +1,26 @@
+MODEL:
+  hidden_size: 512
+  intermediate_size: 1376
+  num_hidden_layers: 6
+  num_attention_heads: 8
+  hidden_act: silu
+  max_position_embeddings: 1024
+  pad_token_id: 0
+  bos_token_id: 1
+  eos_token_id: 2
+  num_special_tokens: 3
+OPTIMIZER:
+  lr: 0.001
+  wd: 0.001
+  warmup_steps: 10000
+  restart_interval: 10000
+  lr_decay: 0.9
+  min_lr: 0.00001
+  plateau_patience: 10000
+DATASET:
+  batch_size: 8
+  tube_length: 8
+TRAINING:
+  accumulate_grad_batches: 2
+  precision: 16
+  accelerator: gpu

@@ -29,6 +29,7 @@ class SinkFormerConfig(LlamaConfig):
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
+        self.num_special_tokens = num_special_tokens
 
         super().__init__(**kwargs)
 
@@ -40,9 +41,9 @@ class SinkFormer(LlamaModel):
         self: Self,
         config: SinkFormerConfig,
     ) -> None:
-        self.sink_key_values = nn.Parameter(th.empty((config.num_hidden_layers, 1, 2, config.num_key_value_heads, config.hidden_size // config.num_attention_heads)))
-
         super().__init__(config)
+
+        self.sink_key_values = nn.Parameter(th.empty((config.num_hidden_layers, 1, 2, config.num_key_value_heads, config.hidden_size // config.num_attention_heads)))
 
     def forward(
         self: Self,
