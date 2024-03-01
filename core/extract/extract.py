@@ -253,6 +253,10 @@ def extract_world(
             continue
 
         file_path = os.path.join(region_dir, f"{region_name}.mca")
+
+        if os.path.getsize(file_path) == 0:  # skip empty regions
+            continue
+
         ndarray_region, scores = extract_from_region(file_path, sample_size)
         save_samples(ndarray_region, scores, output_dir, region_name, sample_size)
     
