@@ -192,13 +192,10 @@ class ColorModule(BitDiffusion):
         # Encode the condition using the sequence encoder
         ctrl = self.ctrl_emb(ctrl) if exists(ctrl) else ctrl
 
-        # Extract the structure from the control
-        structures = ctrl["structure"]
-
         # Normalize input images
         x_0 = norm_fn(x_0)
 
-        bs, *_ = x_0.shape
+        bs, bits, *_ = x_0.shape
 
         # Get the noise and scaling schedules
         sig = self.get_noise(bs)
@@ -219,18 +216,18 @@ class ColorModule(BitDiffusion):
 
         x_p = self.predict(x_t, sig, x_c = x_c, ctrl = ctrl)
 
+        # Extract the structure from the control
+        structure = ctrl["structure"].unsqueeze(1)  # Add channel dimension
+        structure = structure.expand(bs, bits, *structure.shape[1:])  # Expand to match the input shape
+
         # Compute the distribution loss ONLY for blocks that are solid in the structures
-        solid_masks = [structure > 0 for structure in structures]
-
-        loss = self.criterion(x_p, x_0, reduction = "none")
-        device = loss.device
-
-        # Compute the mean loss of each batch according to solid blocks
-        loss = th.tensor([loss[i][mask].mean() for i, mask in enumerate(solid_masks)], device = device)
+        x_0_solid = x_0[structure].view(bs, -1)
+        x_p_solid = x_p[structure].view(bs, -1)
+        loss = self.criterion(x_p_solid, x_0_solid, reduction = "mean")
 
         # Add loss weight
         loss *= self.loss_weight(sig)
-        return loss.mean()
+        return loss
 
     @overload
     def configure_optimizers(self) -> tuple[list]:
