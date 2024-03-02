@@ -79,8 +79,11 @@ class WorldSampleDataset(Dataset):
             raw_data = th.load(file_path, map_location=self.device)
             region_data = th.permute(raw_data["region"], (1, 2, 0))  # (X, Y, Z) -> (Y, Z, X)
             score_data = th.permute(raw_data["scores"], (1, 2, 0))  # (X, Y, Z) -> (Y, Z, X)
-            assert region_data.shape == score_data.shape, (
-                f"Region data shape {region_data.shape} does not match score data shape {score_data.shape}"
+
+            expected_score_data_shape = (region_data.shape[0] + sample_size[0] - 1, region_data.shape[1] + sample_size[1] - 1, region_data.shape[2] + sample_size[2] - 1)
+
+            assert expected_score_data_shape == score_data.shape, (
+                f"Expected score data shape {expected_score_data_shape} does not match score data shape {score_data.shape}"
             )
 
             score_mask = score_data > self.metadata.score_threshold
