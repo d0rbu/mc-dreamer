@@ -120,7 +120,7 @@ class WorldSampleDataModule(L.LightningDataModule):
         }
 
         for split in split_mappings[stage]:
-            setattr(self, f"{split}_dataset", lambda: WorldSampleDataset(
+            setattr(self, f"{split}_dataset", WorldSampleDataset(
                 data_dir = self.data_dir,
                 split = split,
                 sample_size = self.sample_size,
