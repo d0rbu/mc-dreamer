@@ -13,6 +13,11 @@ class ChainedScheduler(th.optim.lr_scheduler.ChainedScheduler):
     @property
     def last_epoch(self):
         return self._schedulers[0].last_epoch
+    
+    @last_epoch.setter
+    def last_epoch(self, value):
+        for scheduler in self._schedulers:
+            scheduler.last_epoch = value
 
 
 class StructureModule(L.LightningModule):
