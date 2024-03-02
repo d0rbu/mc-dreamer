@@ -120,7 +120,7 @@ class WorldSampleDataModule(L.LightningDataModule):
         }
 
         for split in split_mappings[stage]:
-            setattr(self, f"{split}_dataset", WorldSampleDataset(
+            setattr(self, f"{split}_dataset", lambda: WorldSampleDataset(
                 data_dir = self.data_dir,
                 split = split,
                 sample_size = self.sample_size,
@@ -130,7 +130,7 @@ class WorldSampleDataModule(L.LightningDataModule):
             ))
 
             # sets self.train_dataloader, self.val_dataloader, self.test_dataloader, etc.
-            setattr(self, f"{split}_dataloader", DataLoader(
+            setattr(self, f"{split}_dataloader", lambda: DataLoader(
                 getattr(self, f"{split}_dataset"),
                 batch_size = self.batch_size,
                 shuffle = split == "train",
