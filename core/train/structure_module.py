@@ -8,6 +8,13 @@ from core.model.structure_transformer import StructureTransformer
 from core.model.util import generate_binary_mapping
 
 
+# stupid dumb pytorch!!! can't use a chainedscheduler in a sequentiallr!!! so i gotta fix this myself
+class ChainedScheduler(th.optim.lr_scheduler.ChainedScheduler):
+    @property
+    def last_epoch(self):
+        return self._schedulers[0].last_epoch
+
+
 class StructureModule(L.LightningModule):
     """
     Module for autoregressive structure prediction.
@@ -129,9 +136,10 @@ class StructureModule(L.LightningModule):
 
     def configure_optimizers(self):
         optimizer = th.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.wd)
+
         scheduler = th.optim.lr_scheduler.SequentialLR(optimizer, [
             th.optim.lr_scheduler.LinearLR(optimizer, start_factor=1/self.warmup_steps, total_iters=self.warmup_steps),
-            th.optim.lr_scheduler.ChainedScheduler([
+            ChainedScheduler([
                 th.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=self.restart_interval, T_mult=2, eta_min=self.min_lr),
                 th.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda step: self.lr_decay ** (math.floor(math.log2(step/self.restart_interval + 1)))),
                 th.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=self.plateau_patience, min_lr=self.min_lr),
