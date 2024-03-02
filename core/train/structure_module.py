@@ -130,7 +130,7 @@ class StructureModule(L.LightningModule):
     def configure_optimizers(self):
         optimizer = th.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.wd)
         scheduler = th.optim.lr_scheduler.SequentialLR(optimizer, [
-            th.optim.lr_scheduler.LinearLR(optimizer, start_factor=0.0, total_iters=self.warmup_steps),
+            th.optim.lr_scheduler.LinearLR(optimizer, start_factor=1/self.warmup_steps, total_iters=self.warmup_steps),
             th.optim.lr_scheduler.ChainedScheduler([
                 th.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=self.restart_interval, T_mult=2, eta_min=self.min_lr),
                 th.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda step: self.lr_decay ** (math.floor(math.log2(step/self.restart_interval + 1)))),
