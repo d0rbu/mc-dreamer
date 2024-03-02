@@ -4,3 +4,7 @@
 [submodule "modular_diffusion"]
 	path = modular_diffusion
 	url = git@github.com:d0rbu/modular-diffusion.git
+[submodule "Amulet-Generative"]
+	path = Amulet-Generative
+	url = git@github.com:d0rbu/Amulet-Generative.git
+	branch = generative-experimental
