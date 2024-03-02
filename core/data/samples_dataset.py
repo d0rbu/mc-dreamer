@@ -61,7 +61,7 @@ class WorldSampleDataset(Dataset):
         # confirm that all files in are of valid sample size
         sample_size_string = "x".join(map(str, sample_size))
         split_files = getattr(self.metadata, split)
-        self.files = [file for file in split_files if file.path.startswith(sample_size_string)]
+        self.files = [file for file in split_files if os.path.basename(file.path).startswith(sample_size_string)]
         self.num_samples = getattr(self.metadata, f"num_{split}_samples")
 
         # load into memory
