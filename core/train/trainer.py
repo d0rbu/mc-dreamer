@@ -42,16 +42,17 @@ def train(args: argparse.Namespace) -> None:
     model_kwargs = vars(args)
     model = module.from_conf(model_kwargs.pop("config"), **model_kwargs)
     ckpt_callback = ModelCheckpoint(dirpath=args.ckpt_dir, monitor="val_loss", save_top_k=1, mode="min")
-    logger = WandbLogger(log_model="all", project="mc-dreamer", name=f"{args.mode}_training", callbacks=[ckpt_callback])
+    logger = WandbLogger(log_model="all", project="mc-dreamer", name=f"{args.mode}_training")
 
     trainer = Trainer(
         logger = logger,
+        callbacks = [ckpt_callback],
         max_steps = args.steps,
         accumulate_grad_batches = args.accumulate_grad_batches,
         gradient_clip_val = args.gradient_clip_val,
         precision = args.precision,
         accelerator = args.accelerator,
-        devices = args.devices,
+        devices = int(args.devices) if args.devices.isdigit() else args.devices,
         benchmark = True
     )
 

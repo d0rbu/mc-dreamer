@@ -1,6 +1,6 @@
 import torch as th
 import torch.nn as nn
-from transformers.models.llama.modeling_llama import LlamaConfig, LlamaModel
+from transformers.models.llama.modeling_llama import LlamaConfig, LlamaModel, LlamaForCausalLM
 from transformers.cache_utils import DynamicCache
 from typing import Self
 
@@ -10,6 +10,7 @@ class SinkFormerConfig(LlamaConfig):
     
     def __init__(
         self: Self,
+        vocab_size: int = 256,
         hidden_size: int = 512,
         intermediate_size: int = 1376,
         num_hidden_layers: int = 6,
@@ -21,6 +22,9 @@ class SinkFormerConfig(LlamaConfig):
         num_special_tokens: int = 3,
         **kwargs,
     ) -> None:
+        super().__init__(**kwargs)
+
+        self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.intermediate_size = intermediate_size
         self.num_hidden_layers = num_hidden_layers
@@ -30,8 +34,6 @@ class SinkFormerConfig(LlamaConfig):
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
         self.num_special_tokens = num_special_tokens
-
-        super().__init__(**kwargs)
 
 
 class SinkFormer(LlamaModel):
@@ -80,3 +82,17 @@ class SinkFormer(LlamaModel):
             return_dict=return_dict,
             cache_position=cache_position,
         )
+
+
+class CausalSinkFormer(LlamaForCausalLM):
+    def __init__(
+        self: Self,
+        config: SinkFormerConfig
+    ) -> None:
+        super(LlamaForCausalLM, self).__init__()
+        self.model = SinkFormer(config)
+        self.vocab_size = config.vocab_size
+        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
+
+        # Initialize weights and apply final processing
+        self.post_init()

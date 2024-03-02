@@ -15,7 +15,7 @@ if __name__ == "__main__":
     parser.add_argument("--ckpt-dir", type=str, help="Checkpoint directory", default="checkpoints")
     parser.add_argument("--config", type=str, help="Config file", default="core/train/config/structure_default.yaml")
     parser.add_argument("--accelerator", type=str, help="Accelerator", default=None)
-    parser.add_argument("--devices", type=int, help="Number of devices", default=None)
+    parser.add_argument("--devices", help="Number of devices", default="auto")
     parser.add_argument("--data-device", type=str, help="Device to use for data", default="cpu")
     parser.add_argument("--accumulate-grad-batches", type=int, help="Number of batches to accumulate", default=None)
     parser.add_argument("--gradient-clip-val", type=float, help="Gradient clipping value", default=None)

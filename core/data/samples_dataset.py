@@ -171,8 +171,8 @@ class WorldSampleDataset(Dataset):
             return sample
         elif self.dataset_mode == WorldSampleDatasetMode.STRUCTURE:
             structure = sample > 0
-            prev_tube_structure = previous_tube > 0 if previous_tube is not None else None
-            next_tube_structure = next_tube > 0 if next_tube is not None else None
+            prev_tube_structure = previous_tube > 0 if previous_tube is not None else th.full((self.tube_length,), -1, device=self.device)
+            next_tube_structure = next_tube > 0 if next_tube is not None else th.full((self.tube_length,), -1, device=self.device)
 
             return structure, y_index, prev_tube_structure, next_tube_structure
         elif self.dataset_mode == WorldSampleDatasetMode.COLOR:

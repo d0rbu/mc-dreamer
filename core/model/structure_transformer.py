@@ -1,7 +1,7 @@
 import torch as th
 import torch.nn as nn
 from core.model.util import generate_binary_mapping
-from core.model.sinkformer import SinkFormer, SinkFormerConfig
+from core.model.sinkformer import CausalSinkFormer, SinkFormerConfig
 from typing import Self
 
 
@@ -38,9 +38,9 @@ class StructureTransformer(nn.Module):
         self.register_buffer("idx_to_tube", idx_to_tube)
 
         self.tube_in_embedding = nn.Embedding(self.num_token_types, config.hidden_size)
-        self.tube_out_embedding = nn.Linear(config.hidden_size, self.num_tube_types)
+        self.tube_out_embedding = nn.Linear(config.hidden_size, self.num_token_types)
 
-        self.model = SinkFormer(config)
+        self.model = CausalSinkFormer(config)
 
     def forward(
         self: Self,
@@ -49,17 +49,19 @@ class StructureTransformer(nn.Module):
     ) -> th.Tensor:
         original_shape = x.shape
 
-        x = x.view(-1, self.tubes_per_sample, self.tube_length)  # (B, Y, Z, X) -> (B, Y*Z*X/tube_length, tube_length)
-        # let T = number of tubes (X*Y*Z/tube_length)
+        # if we are converting from 3d structure to tube sequence
+        if len(x.shape) == 4:
+            x = x.view(-1, self.tubes_per_sample, self.tube_length)  # (B, Y, Z, X) -> (B, T, tube_length)
 
         x = x @ self.tube_to_idx  # (B, T, tube_length) -> (B, T)  [index of token type]
-        x = x % self.num_token_types  # convert -1, -2, etc. to num_token_types-1, num_token_types-2, etc.
-        x = self.tube_in_embedding(x)  # (B, T) -> (B, T, d_model)
 
-        x = self.model(x, y_indices)  # (B, T, d_model) -> (B, T, d_model)
+        special_tokens_mask = x < 0
+        x[special_tokens_mask] = -x[special_tokens_mask]
+        x[~special_tokens_mask] += self.model.config.num_special_tokens
 
-        x = self.tube_out_embedding(x)  # (B, T, d_model) -> (B, T, num_tube_types)
-        # turn distribution of tube types into distribution of solid/air blocks
-        x = x @ self.idx_to_tube  # (B, T, num_tube_types) -> (B, T, tube_length)
+        x = self.model(x, y_indices)  # (B, T) -> (B, T, num_token_types)
+
+        # turn distribution of tube types into distribution of solid/air blocks and special tokens
+        x = th.cat([x[..., :self.num_tube_types] @ self.idx_to_tube, x[..., self.num_tube_types:]], dim = -1)  # (B, T, num_token_types) -> (B, T, tube_length + num_special_tokens)
 
         return x.view(original_shape)  # (B, T, tube_length) -> (B, Y, Z, X)

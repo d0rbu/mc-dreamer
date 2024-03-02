@@ -24,3 +24,4 @@ TRAINING:
   accumulate_grad_batches: 2
   precision: 16
   accelerator: gpu
+  steps: -1  # infinite
