@@ -73,7 +73,7 @@ class StructureModule(L.LightningModule):
         lr_decay: float = 0.9,
         min_lr: float = 1e-5,
         plateau_patience: int = 10000,
-        plateau_metric: str = "val_loss",
+        plateau_metric: str = "val_loss_epoch",
         **kwargs: dict,
     ) -> None:
         super().__init__()
