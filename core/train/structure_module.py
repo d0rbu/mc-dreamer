@@ -19,6 +19,15 @@ class ChainedScheduler(th.optim.lr_scheduler.ChainedScheduler):
         for scheduler in self._schedulers:
             scheduler.last_epoch = value
 
+    def step(self, metrics = None):
+        for scheduler in self._schedulers:
+            if isinstance(scheduler, th.optim.lr_scheduler.ReduceLROnPlateau):
+                scheduler.step(metrics)
+            else:
+                scheduler.step()
+
+        self._last_lr = [group['lr'] for group in self._schedulers[-1].optimizer.param_groups]
+
 
 class StructureModule(L.LightningModule):
     """
