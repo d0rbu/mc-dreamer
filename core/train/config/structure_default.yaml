@@ -16,7 +16,7 @@ OPTIMIZER:
   restart_interval: 10000
   lr_decay: 0.9
   min_lr: 0.00001
-  plateau_patience: 100000
+  plateau_patience: 10
 DATASET:
   batch_size: 8
   tube_length: 8
