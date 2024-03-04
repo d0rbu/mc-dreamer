@@ -73,6 +73,7 @@ class StructureModule(L.LightningModule):
 
         self.sample_size = sample_size
         self.tube_length = tube_length
+        self.num_tube_types = 1 << tube_length
         self.total_sample_size = sample_size[0] * sample_size[1] * sample_size[2]
         self.tubes_per_sample = self.total_sample_size // tube_length
 
@@ -88,14 +89,23 @@ class StructureModule(L.LightningModule):
         self.plateau_patience = plateau_patience
         self.plateau_metric = plateau_metric
 
-        self._tube_to_idx = th.Tensor([1 << i for i in range(tube_length)]).int()  # (tube_length,)
-        self._idx_to_tube = generate_binary_mapping(self.num_tube_types, self.tube_length)  # (num_tube_types, tube_length)
+        self._cpu = th.device("cpu")
+        self._tube_to_idx = {
+            self._cpu: th.tensor([1 << i for i in range(tube_length)], dtype=th.float32)  # (tube_length,)
+        }
+        self._idx_to_tube = {
+            self._cpu: generate_binary_mapping(self.num_tube_types, self.tube_length)  # (num_tube_types, tube_length)
+        }
     
     def tube_to_idx(
         self: Self,
         x: th.Tensor,
     ) -> th.Tensor:
-        return x @ self._tube_to_idx + self.NUM_SPECIAL_TOKENS
+        if (tube_to_idx := self._tube_to_idx.get(x.device, None)) is None:
+            tube_to_idx = self._tube_to_idx[self._cpu].to(x.device)
+            self._tube_to_idx[x.device] = tube_to_idx
+
+        return (x.float() @ tube_to_idx).long() + self.NUM_SPECIAL_TOKENS
     
     def idx_to_tube(
         self: Self,
@@ -110,29 +120,26 @@ class StructureModule(L.LightningModule):
         **kwargs: dict[str, any],
     ) -> tuple | CausalLMOutputWithPast:
         return self.model(x, y_indices, **kwargs)
-
-    def training_step(self, batch, batch_idx):
-        structure, y_indices, prev_tube, next_tube = batch
-        prev_tube, next_tube = prev_tube.int(), next_tube.int()
+    
+    def _tube_batch_to_sequence(self, structure: th.Tensor, prev_tube: th.Tensor, next_tube: th.Tensor) -> th.Tensor:
         batch_size = structure.shape[0]
 
-
-        bos_tube_mask = prev_tube[..., :1] == -1
+        bos_tube_mask = prev_tube[..., 0] == -1
         num_bos_tubes = bos_tube_mask.sum()
 
         if num_bos_tubes < batch_size:
-            print("found non-empty prev tube!!")
+            import pdb; pdb.set_trace()
 
         prev_token = self.tube_to_idx(prev_tube)  # (B, tube_length) -> (B, 1)  [index of token type]
         if num_bos_tubes > 0:
             prev_token[bos_tube_mask] = self.model.config.bos_token_id  # (B, tube_length,) -> (B, tube_length)
 
 
-        eos_tube_mask = next_tube[..., :1] == -1
+        eos_tube_mask = next_tube[..., 0] == -1
         num_eos_tubes = eos_tube_mask.sum()
 
         if num_eos_tubes < batch_size:
-            print("found non-empty next tube!!")
+            import pdb; pdb.set_trace()
 
         next_token = self.tube_to_idx(next_tube)  # (B, tube_length) -> (B, 1)  [index of token type]
         if num_eos_tubes > 0:
@@ -141,19 +148,43 @@ class StructureModule(L.LightningModule):
 
         sequence = th.cat(
             (
-                prev_token,
+                prev_token.unsqueeze(-1),
                 self.tube_to_idx(structure.view(batch_size, self.tubes_per_sample, self.tube_length)).squeeze(),
-                next_token,
+                next_token.unsqueeze(-1),
             ),
             dim=1,
         )  # (B, Y, Z, X) -> (B, T + 2) [index of token type]
 
-        del structure, batch, next_tube, next_token, prev_tube, prev_token  # free up memory
+        del structure, next_tube, next_token, prev_tube, prev_token  # free up memory
         th.cuda.empty_cache()
 
-        loss, logits, cache = self(sequence[:-1], y_indices, labels=sequence)  # (B, T + 1) -> (B, T + 1, num_tokens)
+        return sequence
 
-        return loss
+    def training_step(self, batch, batch_idx):
+        structure, y_indices, prev_tube, next_tube = batch
+        batch_size = structure.shape[0]
+
+        sequence = self._tube_batch_to_sequence(structure, prev_tube, next_tube)
+        del structure, prev_tube, next_tube
+
+        outputs = self(sequence, y_indices, labels=sequence)  # (B, T + 1) -> (B, T + 1, num_tokens)
+
+        self.log("train_loss", outputs.loss.item(), on_step=True, batch_size=batch_size)
+
+        return outputs.loss
+
+    def validation_step(self, batch, batch_idx):
+        structure, y_indices, prev_tube, next_tube = batch
+        batch_size = structure.shape[0]
+
+        sequence = self._tube_batch_to_sequence(structure, prev_tube, next_tube)
+
+        outputs = self(sequence, y_indices, labels=sequence)  # (B, T + 1) -> (B, T + 1, num_tokens)
+        predicted = th.argmax(outputs.logits, dim=-1)
+        acc = (predicted[:, :-1] == sequence[:, 1:]).mean().item()
+
+        self.log("val_loss", outputs.loss.item(), on_step=True, batch_size=batch_size)
+        self.log("val_acc", acc, on_step=True, batch_size=batch_size)
 
     def configure_optimizers(self):
         optimizer = th.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.wd)

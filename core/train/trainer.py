@@ -47,6 +47,7 @@ def train(args: argparse.Namespace) -> None:
     trainer = Trainer(
         logger = logger,
         callbacks = [ckpt_callback],
+        max_epochs = -1,
         max_steps = args.steps,
         accumulate_grad_batches = args.accumulate_grad_batches,
         gradient_clip_val = args.gradient_clip_val,

@@ -15,6 +15,7 @@ class SinkFormerConfig(LlamaConfig):
         intermediate_size: int = 1376,
         num_hidden_layers: int = 6,
         num_attention_heads: int = 8,
+        num_key_value_heads: int | None = None,
         max_position_embeddings: int = 1024,
         pad_token_id: int = 0,
         bos_token_id: int = 1,
@@ -24,11 +25,15 @@ class SinkFormerConfig(LlamaConfig):
     ) -> None:
         super().__init__(**kwargs)
 
-        self.vocab_size = vocab_size
+        if num_key_value_heads is None:
+            num_key_value_heads = num_attention_heads
+
+        self.vocab_size = vocab_size + num_special_tokens
         self.hidden_size = hidden_size
         self.intermediate_size = intermediate_size
         self.num_hidden_layers = num_hidden_layers
         self.num_attention_heads = num_attention_heads
+        self.num_key_value_heads = num_key_value_heads
         self.max_position_embeddings = max_position_embeddings
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
@@ -45,33 +50,38 @@ class SinkFormer(LlamaModel):
     ) -> None:
         super().__init__(config)
 
-        self.sink_key_values = nn.Parameter(th.empty((config.num_hidden_layers, 1, 2, config.num_key_value_heads, config.hidden_size // config.num_attention_heads)))
+        self.sink_key_values = nn.Parameter(th.empty((config.num_hidden_layers, 2, 1, config.num_key_value_heads, 1, config.hidden_size // config.num_attention_heads)))
 
     def forward(
         self: Self,
-        inputs_embeds: th.Tensor,
+        input_ids: th.LongTensor,
         start_pos_indices: th.Tensor | None = None,
+        position_ids: th.LongTensor | None = None,
         attention_mask: th.Tensor | None = None,
         past_key_values: list[th.FloatTensor] | None = None,
+        inputs_embeds: th.FloatTensor | None = None,
         output_attentions: bool = False,
         output_hidden_states: bool = False,
         return_dict: bool = False,
         cache_position: th.LongTensor | None = None,
+        **kwargs,
     ) -> th.Tensor:
-        if start_pos_indices is None:
-            position_ids = None
-        else:
-            position_ids = th.arange(inputs_embeds.shape[1], device=inputs_embeds.device).unsqueeze(0)
+        if position_ids is None and start_pos_indices is not None:
+            position_ids = th.arange(input_ids.shape[1], device=input_ids.device)
             position_ids += start_pos_indices
 
         # set up initial sink key values
         if past_key_values is None or \
                 (isinstance(past_key_values, list) and len(past_key_values[0]) == 0) or \
                 (isinstance(past_key_values, DynamicCache) and past_key_values.seen_tokens == 0):
-            past_key_values = [[self.sink_key_values[layer_idx]] for layer_idx in range(self.config.num_hidden_layers)] 
-            past_key_values = DynamicCache.from_legacy_cache(past_key_values)
+            batch_size = input_ids.shape[0]
+            past_key_values = [[*self.sink_key_values[layer_idx].expand(-1, batch_size, -1, -1, -1)] for layer_idx in range(self.config.num_hidden_layers)]
+        
+        if "use_cache" in kwargs:
+            del kwargs["use_cache"]
 
         return super().forward(
+            input_ids=input_ids,
             attention_mask=attention_mask,
             position_ids=position_ids,
             past_key_values=past_key_values,
@@ -81,6 +91,7 @@ class SinkFormer(LlamaModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
             cache_position=cache_position,
+            **kwargs,
         )
 
 
@@ -89,7 +100,7 @@ class CausalSinkFormer(LlamaForCausalLM):
         self: Self,
         config: SinkFormerConfig
     ) -> None:
-        super(LlamaForCausalLM, self).__init__()
+        super(LlamaForCausalLM, self).__init__(config)
         self.model = SinkFormer(config)
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
