@@ -128,7 +128,7 @@ class StructureModule(L.LightningModule):
         num_bos_tubes = bos_tube_mask.sum()
 
         if num_bos_tubes < batch_size:
-            import pdb; pdb.set_trace()
+            print("found non starting sample!!")
 
         prev_token = self.tube_to_idx(prev_tube)  # (B, tube_length) -> (B, 1)  [index of token type]
         if num_bos_tubes > 0:
@@ -139,7 +139,7 @@ class StructureModule(L.LightningModule):
         num_eos_tubes = eos_tube_mask.sum()
 
         if num_eos_tubes < batch_size:
-            import pdb; pdb.set_trace()
+            print("found non ending sample!!")
 
         next_token = self.tube_to_idx(next_tube)  # (B, tube_length) -> (B, 1)  [index of token type]
         if num_eos_tubes > 0:

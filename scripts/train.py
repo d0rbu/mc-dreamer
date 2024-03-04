@@ -20,7 +20,7 @@ if __name__ == "__main__":
     parser.add_argument("--accumulate-grad-batches", type=int, help="Number of batches to accumulate", default=None)
     parser.add_argument("--gradient-clip-val", type=float, help="Gradient clipping value", default=None)
     parser.add_argument("--precision", type=int, help="Precision", default=None)
-    parser.add_argument("--val-check-interval", type=int, help="Validation check interval", default=1000)
+    parser.add_argument("--val-check-interval", type=int, help="Validation check interval", default=None)
 
     args = parser.parse_args()
 
