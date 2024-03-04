@@ -55,7 +55,8 @@ def train(args: argparse.Namespace) -> None:
         precision = args.precision,
         accelerator = args.accelerator,
         devices = int(args.devices) if args.devices.isdigit() else args.devices,
-        benchmark = True
+        benchmark = True,
+        val_check_interval = args.val_check_interval,
     )
 
     trainer.fit(model, datamodule=data_module)

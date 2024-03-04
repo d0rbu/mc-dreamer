@@ -50,7 +50,10 @@ class SinkFormer(LlamaModel):
     ) -> None:
         super().__init__(config)
 
+        std = self.config.initializer_range
+        # llama only initializes embeddings and linear layers for some reason
         self.sink_key_values = nn.Parameter(th.empty((config.num_hidden_layers, 2, 1, config.num_key_value_heads, 1, config.hidden_size // config.num_attention_heads)))
+        self.sink_key_values.data.normal_(mean=0.0, std=std)
 
     def forward(
         self: Self,

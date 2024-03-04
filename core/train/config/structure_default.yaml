@@ -16,7 +16,7 @@ OPTIMIZER:
   restart_interval: 10000
   lr_decay: 0.9
   min_lr: 0.00001
-  plateau_patience: 10000
+  plateau_patience: 100000
 DATASET:
   batch_size: 8
   tube_length: 8
@@ -25,3 +25,4 @@ TRAINING:
   precision: 16
   accelerator: gpu
   steps: -1  # infinite
+  val_check_interval: 10000
