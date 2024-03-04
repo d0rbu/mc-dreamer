@@ -181,7 +181,7 @@ class StructureModule(L.LightningModule):
 
         outputs = self(sequence, y_indices, labels=sequence)  # (B, T + 1) -> (B, T + 1, num_tokens)
         predicted = th.argmax(outputs.logits, dim=-1)
-        acc = (predicted[:, :-1] == sequence[:, 1:]).mean().item()
+        acc = (predicted[:, :-1] == sequence[:, 1:]).float().mean().item()
 
         self.log("val_loss", outputs.loss.item(), on_step=True, batch_size=batch_size)
         self.log("val_acc", acc, on_step=True, batch_size=batch_size)

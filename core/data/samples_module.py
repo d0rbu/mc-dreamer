@@ -2,6 +2,7 @@ import os
 import shutil
 import torch as th
 import lightning as L
+from functools import partial
 from core.extract import extract_world
 from core.data.samples_dataset import WorldSampleDataset, WorldSampleDatasetMode
 from torch.utils.data import DataLoader
@@ -111,6 +112,14 @@ class WorldSampleDataModule(L.LightningDataModule):
             self.scrape_data()
 
         self.prepare_data()
+    
+    def get_dataloader(self: Self, split: str) -> DataLoader:
+        return DataLoader(
+            getattr(self, f"{split}_dataset"),
+            batch_size = self.batch_size,
+            shuffle = split == "train",
+            num_workers = self.num_workers,
+        )
 
     def setup(self: Self, stage: str) -> None:
         split_mappings = {
@@ -130,9 +139,4 @@ class WorldSampleDataModule(L.LightningDataModule):
             ))
 
             # sets self.train_dataloader, self.val_dataloader, self.test_dataloader, etc.
-            setattr(self, f"{split}_dataloader", lambda: DataLoader(
-                getattr(self, f"{split}_dataset"),
-                batch_size = self.batch_size,
-                shuffle = split == "train",
-                num_workers = self.num_workers,
-            ))
+            setattr(self, f"{split}_dataloader", partial(self.get_dataloader, split))

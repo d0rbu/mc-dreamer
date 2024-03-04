@@ -1,7 +1,7 @@
 import argparse
 import yaml
 from lightning import Trainer
-from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor
 from lightning.pytorch.loggers import WandbLogger
 from core.data.samples_module import WorldSampleDataModule
 from core.train.structure_module import StructureModule
@@ -42,11 +42,12 @@ def train(args: argparse.Namespace) -> None:
     model_kwargs = vars(args)
     model = module.from_conf(model_kwargs.pop("config"), **model_kwargs)
     ckpt_callback = ModelCheckpoint(dirpath=args.ckpt_dir, monitor="val_loss", save_top_k=1, mode="min")
+    lr_callback = LearningRateMonitor(logging_interval="step")
     logger = WandbLogger(log_model="all", project="mc-dreamer", name=f"{args.mode}_training")
 
     trainer = Trainer(
         logger = logger,
-        callbacks = [ckpt_callback],
+        callbacks = [ckpt_callback, lr_callback],
         max_epochs = -1,
         max_steps = args.steps,
         accumulate_grad_batches = args.accumulate_grad_batches,
