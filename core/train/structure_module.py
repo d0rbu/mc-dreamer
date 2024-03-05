@@ -2,29 +2,56 @@ import math
 import yaml
 import lightning as L
 import torch as th
-from typing import Self
+from bisect import bisect_right
+from typing import Self, Any
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from core.model.sinkformer import SinkFormerConfig, CausalSinkFormer
 from core.model.util import generate_binary_mapping
 
 
-# stupid dumb pytorch!!! can't use a chainedscheduler in a sequentiallr!!! so i gotta fix this myself
+def step_scheduler(scheduler: th.optim.lr_scheduler.LRScheduler, epoch: int | None = None, metrics: Any = None) -> None:
+    if isinstance(scheduler, th.optim.lr_scheduler.ReduceLROnPlateau):
+        if metrics is not None:
+            scheduler.step(metrics, epoch)
+
+        return
+
+    if isinstance(scheduler, (ChainedScheduler, SequentialLR)):
+        scheduler.step(epoch, metrics)
+        return
+
+    if isinstance(scheduler, th.optim.lr_scheduler.CosineAnnealingWarmRestarts):
+        scheduler.step(epoch)
+        return
+
+    scheduler.step()
+
+
+# why arent these classes compatible
+class SequentialLR(th.optim.lr_scheduler.SequentialLR):
+    def step(self, epoch: int | None = None, metrics: Any = None) -> None:
+        self.last_epoch += 1
+        idx = bisect_right(self._milestones, self.last_epoch)
+        scheduler = self._schedulers[idx]
+
+        milestone = 0 if idx == 0 else self._milestones[idx - 1]
+        step_scheduler(scheduler, epoch - milestone, metrics)
+
+        self._last_lr = scheduler.get_last_lr()
+
 class ChainedScheduler(th.optim.lr_scheduler.ChainedScheduler):
     @property
     def last_epoch(self):
-        return self._schedulers[0].last_epoch
+        return self._schedulers[-1].last_epoch
     
     @last_epoch.setter
     def last_epoch(self, value):
         for scheduler in self._schedulers:
             scheduler.last_epoch = value
 
-    def step(self, metrics = None):
+    def step(self: Self, epoch: int | None = None, metrics: Any = None) -> None:
         for scheduler in self._schedulers:
-            if isinstance(scheduler, th.optim.lr_scheduler.ReduceLROnPlateau):
-                scheduler.step(metrics)
-            else:
-                scheduler.step()
+            step_scheduler(scheduler, epoch, metrics)
 
         self._last_lr = [group['lr'] for group in self._schedulers[-1].optimizer.param_groups]
 
@@ -74,6 +101,7 @@ class StructureModule(L.LightningModule):
         min_lr: float = 1e-5,
         plateau_patience: int = 10000,
         plateau_metric: str = "val_loss_epoch",
+        val_check_interval: int = 1000,
         **kwargs: dict,
     ) -> None:
         super().__init__()
@@ -97,6 +125,7 @@ class StructureModule(L.LightningModule):
         self.min_lr = min_lr
         self.plateau_patience = plateau_patience
         self.plateau_metric = plateau_metric
+        self.val_check_interval = val_check_interval
 
         self._cpu = th.device("cpu")
         self._tube_to_idx = {
@@ -126,7 +155,7 @@ class StructureModule(L.LightningModule):
         self: Self,
         x: th.Tensor,
         y_indices: th.Tensor,
-        **kwargs: dict[str, any],
+        **kwargs: dict[str, Any],
     ) -> tuple | CausalLMOutputWithPast:
         return self.model(x, y_indices, **kwargs)
     
@@ -194,24 +223,30 @@ class StructureModule(L.LightningModule):
 
         self.log("val_loss", outputs.loss.item(), on_step=True, batch_size=batch_size)
         self.log("val_acc", acc, on_step=True, batch_size=batch_size)
+    
+    def lr_scheduler_step(self, scheduler: th.optim.lr_scheduler.LRScheduler, metric: Any | None) -> None:
+        scheduler.step(epoch=self.global_step, metrics=metric)
 
     def configure_optimizers(self):
         optimizer = th.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.wd)
 
-        scheduler = th.optim.lr_scheduler.SequentialLR(optimizer, [
+        scheduler = SequentialLR(optimizer, [
             th.optim.lr_scheduler.LinearLR(optimizer, start_factor=1/self.warmup_steps, total_iters=self.warmup_steps),
             ChainedScheduler([
                 th.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=self.restart_interval, T_mult=2, eta_min=self.min_lr),
-                th.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda step: self.lr_decay ** (math.floor(math.log2(step/self.restart_interval + 1)))),
+                th.optim.lr_scheduler.MultiplicativeLR(optimizer, lr_lambda=lambda step: self.lr_decay ** (math.floor(math.log2(step/self.restart_interval + 1)))),
                 th.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=self.plateau_patience, min_lr=self.min_lr),
             ])
         ], milestones=[self.warmup_steps])
 
-        scheduler_config = {
+        scheduler = {
             "scheduler": scheduler,
             "interval": "step",
             "frequency": 1,
             "monitor": self.plateau_metric,
         }
 
-        return [optimizer], [scheduler_config]
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": scheduler,
+        }
