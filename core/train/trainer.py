@@ -56,7 +56,7 @@ def train(args: argparse.Namespace) -> None:
         accelerator = args.accelerator,
         devices = int(args.devices) if args.devices.isdigit() else args.devices,
         benchmark = True,
-        val_check_interval = args.val_check_interval * args.accumulate_grad_batches
+        val_check_interval = args.val_check_interval * args.accumulate_grad_batches,
     )
 
-    trainer.fit(model, datamodule=data_module)
+    trainer.fit(model, datamodule=data_module, ckpt_path=args.ckpt_path)

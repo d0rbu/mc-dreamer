@@ -21,6 +21,7 @@ if __name__ == "__main__":
     parser.add_argument("--gradient-clip-val", type=float, help="Gradient clipping value", default=None)
     parser.add_argument("--precision", type=int, help="Precision", default=None)
     parser.add_argument("--val-check-interval", type=int, help="Validation check interval", default=None)
+    parser.add_argument("--ckpt-path", type=str, help="Checkpoint path to load from", default="last")
 
     args = parser.parse_args()
 
