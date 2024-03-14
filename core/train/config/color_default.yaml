@@ -1,0 +1,24 @@
+MODEL:
+  net_dim: 8
+  channels: 8
+  ctrl_dim: 256
+DIFFUSION:
+  img_size: [16, 16, 16]
+  num_bits: 8
+OPTIMIZER:
+  lr: 0.0008
+  wd: 0.0008
+  warmup_steps: 1000
+  restart_interval: 1000
+  lr_decay: 0.9
+  min_lr: 0.00001
+  plateau_patience: 10
+DATASET:
+  batch_size: 64
+  tube_length: 8
+TRAINING:
+  accumulate_grad_batches: 8
+  precision: 16
+  accelerator: gpu
+  steps: -1  # infinite
+  val_check_interval: 1000

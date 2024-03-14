@@ -29,7 +29,7 @@ class Unet3D(UNet):
         qry_chunk : int = 512,
         key_chunk : int = 1024,
     ) -> None:
-        super(nn.Module, self).__init__()
+        super(UNet, self).__init__()
 
         out_dim = default(out_dim, channels)
 

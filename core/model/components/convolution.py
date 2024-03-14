@@ -32,7 +32,7 @@ class ConvTimeRes3D(ConvTimeRes):
         num_group : int = 8,
     ) -> None:
         # Skip ConvTimeRes init
-        super(nn.Module, self).__init__()
+        super(ConvTimeRes, self).__init__()
 
         out_dim = default(out_dim, inp_dim)
         hid_dim = default(hid_dim, out_dim)

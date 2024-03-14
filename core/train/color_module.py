@@ -109,7 +109,7 @@ class ColorModule(BitDiffusion):
     Module for color prediction.
     """
     
-    NET_DEFAULTS = {
+    DIFFUSION_DEFAULTS = {
         "num_bits": 8,
         "img_size": (16, 16, 16),
         "data_key": "sample",
@@ -118,9 +118,6 @@ class ColorModule(BitDiffusion):
     OPT_DEFAULTS = {
         "lr": 1e-3,
         "weight_decay": 1e-3,
-        "warmup_steps": 10000,
-    }
-    LR_DEFAULTS = {
         "warmup_steps": 10000,
         "restart_interval": 10000,
         "lr_decay": 0.9,
@@ -148,15 +145,13 @@ class ColorModule(BitDiffusion):
         cls.conf = conf
         opt_conf = cls.OPT_DEFAULTS.copy()
         opt_conf.update(conf["OPTIMIZER"])
-        lr_conf = cls.LR_DEFAULTS.copy()
-        lr_conf.update(conf["LR"])
 
         cls.conf["OPTIMIZER"] = opt_conf
-        cls.conf["LR"] = lr_conf
 
-        net_par = cls.NET_DEFAULTS.copy()
-        net_par.update(conf["MODEL"])
-        dif_par = conf["DIFFUSION"]
+        net_par = conf["MODEL"]
+        dif_par = cls.DIFFUSION_DEFAULTS.copy()
+        dif_par.update(conf["DIFFUSION"])
+        kwargs.update(dif_par)
 
         # Grab the batch size for precise metric logging
         cls.batch_size = conf["DATASET"]["batch_size"]
@@ -164,7 +159,9 @@ class ColorModule(BitDiffusion):
         # Initialize the network
         net = Unet3D(**net_par)
 
-        return cls(net, ctrl_dim = net_par["ctrl_dim"], **kwargs, **dif_par)
+        ctrl_dim = kwargs.pop("ctrl_dim")
+
+        return cls(ctrl_dim, net, **kwargs)
 
     def __init__(
         self: Self,
