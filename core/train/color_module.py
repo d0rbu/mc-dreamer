@@ -173,9 +173,6 @@ class ColorModule(BitDiffusion):
 
         self.ctrl_emb = ControlEmbedder(ctrl_dim)
 
-    def criterion(self) -> Callable:
-        return th.nn.CrossEntropyLoss()  # CE for classification instead of regression
-
     def compute_loss(
         self: Self,
         x_0 : th.Tensor,
@@ -185,6 +182,9 @@ class ColorModule(BitDiffusion):
     ) -> th.Tensor:
         use_x_c = default(use_x_c, self.self_cond)
         norm_fn = default(norm_fn, self.norm_forward)
+
+        # Extract the structure from the control
+        structure = ctrl["structure"].unsqueeze(1)  # Add channel dimension
 
         # Encode the condition using the sequence encoder
         ctrl = self.ctrl_emb(ctrl) if exists(ctrl) else ctrl
@@ -212,15 +212,10 @@ class ColorModule(BitDiffusion):
                 x_c.detach_()
 
         x_p = self.predict(x_t, sig, x_c = x_c, ctrl = ctrl)
-
-        # Extract the structure from the control
-        structure = ctrl["structure"].unsqueeze(1)  # Add channel dimension
-        structure = structure.expand(bs, bits, *structure.shape[1:])  # Expand to match the input shape
+        structure = structure.expand(bs, bits, *structure.shape[2:])  # Expand to match the input shape
 
         # Compute the distribution loss ONLY for blocks that are solid in the structures
-        x_0_solid = x_0[structure].view(bs, -1)
-        x_p_solid = x_p[structure].view(bs, -1)
-        loss = self.criterion(x_p_solid, x_0_solid, reduction = "mean")
+        loss = self.criterion(x_p[structure], x_0[structure], reduction = "mean")
 
         # Add loss weight
         loss *= self.loss_weight(sig)
