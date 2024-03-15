@@ -7,7 +7,7 @@ from typing import Optional
 
 def Upsample3D(dim_in, dim_out = None):
     return nn.Sequential(
-        nn.Upsample(scale_factor = 2, mode = 'nearest'),
+        nn.Upsample(scale_factor = 2, mode = "nearest"),
         nn.Conv3d(dim_in, default(dim_out, dim_in), 3, padding = 1)
     )
 
@@ -15,13 +15,13 @@ def Downsample3D(dim_in, dim_out = None):
     return nn.Conv3d(dim_in, default(dim_out, dim_in), 4, 2, 1)
 
 class ConvTimeRes3D(ConvTimeRes):
-    '''
+    """
         Convolutional Residual Block with time embedding
         injection support, used by Diffusion Models. It is
         composed of two convolutional layers with normalization.
         The time embedding signal is injected between the two
         convolutions and is added to the input to the second one.
-    '''
+    """
 
     def __init__(
         self,

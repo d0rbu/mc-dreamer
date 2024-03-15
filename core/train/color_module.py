@@ -1,14 +1,14 @@
 import math
 import yaml
-import lightning as L
 import torch as th
 import torch.nn as nn
+from einops import rearrange, reduce
 from modular_diffusion.diffusion.discrete import BitDiffusion
 from modular_diffusion.diffusion.module.utils.misc import default, exists, enlarge_as
-from einops import reduce
 from random import random
 from core.model.unet import Unet3D
-from typing import Callable, Optional, Self, overload
+from typing import Callable, Optional, Self
+from core.scheduler import SequentialLR, ChainedScheduler, step_scheduler
 
 
 # vaswani et al 2017
@@ -64,7 +64,7 @@ class StructureEmbedder(nn.Module):
         super().__init__()
 
         self.input_dim = sample_size[0] * sample_size[1] * sample_size[2]
-        self.hidden_dim = int(self.embedding_dim * projection_ratio)
+        self.hidden_dim = int(embedding_dim * projection_ratio)
 
         self.pre_norm = nn.LayerNorm(self.input_dim)
         self.up_proj = nn.Linear(self.input_dim, self.hidden_dim)
@@ -80,7 +80,7 @@ class StructureEmbedder(nn.Module):
         structure = structure.view(structure.shape[0], -1)
         structure = self.pre_norm(structure)
 
-        return self.norm(self.down_proj(self.activation(self.gate_proj(structure)) * self.up_proj(structure)))
+        return self.post_norm(self.down_proj(self.activation(self.gate_proj(structure)) * self.up_proj(structure)))
 
 
 class ControlEmbedder(nn.Module):
@@ -100,6 +100,7 @@ class ControlEmbedder(nn.Module):
         control_inputs: dict[str, th.Tensor],
     ) -> th.Tensor:
         structure, y_indices = control_inputs["structure"], control_inputs["y_index"]
+        structure = structure.float() * 2 - 1  # from {0, 1} to {-1, 1}
 
         return self.pos_embedder(y_indices) + self.structure_embedder(structure)
 
@@ -134,9 +135,9 @@ class ColorModule(BitDiffusion):
         path: str,
         **kwargs,
     ) -> Self:
-        '''
+        """
             Initialize the Diffusion model from a YAML configuration file.
-        '''
+        """
 
         with open(path, "r") as f:
             conf = yaml.safe_load(f)
@@ -161,7 +162,7 @@ class ColorModule(BitDiffusion):
 
         ctrl_dim = kwargs.pop("ctrl_dim")
 
-        return cls(ctrl_dim, net, **kwargs)
+        return cls(ctrl_dim, model=net, **kwargs)
 
     def __init__(
         self: Self,
@@ -172,7 +173,6 @@ class ColorModule(BitDiffusion):
 
         self.ctrl_emb = ControlEmbedder(ctrl_dim)
 
-    @overload
     def criterion(self) -> Callable:
         return th.nn.CrossEntropyLoss()  # CE for classification instead of regression
 
@@ -189,7 +189,7 @@ class ColorModule(BitDiffusion):
         # Encode the condition using the sequence encoder
         ctrl = self.ctrl_emb(ctrl) if exists(ctrl) else ctrl
 
-        # Normalize input images
+        # Normalize input volumes
         x_0 = norm_fn(x_0)
 
         bs, bits, *_ = x_0.shape
@@ -226,17 +226,54 @@ class ColorModule(BitDiffusion):
         loss *= self.loss_weight(sig)
         return loss
 
-    @overload
+    @classmethod
+    def int2bit(cls, decs : th.Tensor, nbits : int = 8, scale : float = 1.) -> th.Tensor:
+        """
+            Convert input (int) tensor x (values in [0, 255])
+            to analog bits in [-1, 1].
+        """
+        device = decs.device
+
+        decs = decs.clamp(min = 0, max = 255).long()
+
+        # Build the bitmask needed for decimal-to-bit conversion
+        mask = 2 ** th.arange(nbits - 1, -1, -1, device = device, dtype = th.long)
+
+        mask = rearrange(mask, "d -> d 1 1 1").contiguous()
+        decs = rearrange(decs, "b c y z x -> b c 1 y z x").contiguous()
+
+        # Get the analog bits
+        bits = ((decs & mask) != 0).float()
+        bits = rearrange(bits, "b c d y z x -> b (c d) y z x").contiguous()
+
+        return (bits * 2 - 1) * scale
+
+    @classmethod
+    def bit2int(cls, bits : th.Tensor, nbits : int = 8) -> th.Tensor:
+        """
+        """
+        device = bits.device
+
+        bits = (bits > 0).int()
+        mask = 2 ** th.arange(nbits - 1, -1, -1, device = device, dtype = int)
+
+        mask = rearrange(mask, "d -> d 1 1 1").contiguous()
+        bits = rearrange(bits, "b (c d) y z x -> b c d y z x", d = nbits).contiguous()
+
+        decs = reduce(bits * mask, "b c d y z x -> b c y z x", "sum").contiguous()
+
+        return decs.clamp(0, 255)
+
     def configure_optimizers(self) -> tuple[list]:
         optim_conf = self.conf["OPTIMIZER"]
 
-        optimizer = super().configure_optimizers()
-        scheduler = th.optim.lr_scheduler.SequentialLR(optimizer, [
-            th.optim.lr_scheduler.LinearLR(optimizer, start_factor=0.0, total_iters=optim_conf["warmup_steps"]),
-            th.optim.lr_scheduler.ChainedScheduler([
+        optimizer = th.optim.AdamW(self.parameters(), lr=optim_conf["lr"], weight_decay=optim_conf["wd"])
+        scheduler = SequentialLR(optimizer, [
+            th.optim.lr_scheduler.LinearLR(optimizer, start_factor=1/optim_conf["warmup_steps"], total_iters=optim_conf["warmup_steps"]),
+            ChainedScheduler([
                 th.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=optim_conf["restart_interval"], T_mult=2, eta_min=optim_conf["min_lr"]),
-                th.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda step: optim_conf["lr_decay"] ** (math.floor(math.log2(step/self.restart_interval + 1)))),
-                th.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode=optim_conf["plateau_mode"], factor=optim_conf["plateau_factor"], patience=optim_conf["plateau_patience"], min_lr=optim_conf["min_lr"]),
+                th.optim.lr_scheduler.MultiplicativeLR(optimizer, lr_lambda=lambda step: optim_conf["lr_decay"] ** (math.floor(math.log2(step/self.restart_interval + 1)))),
+                th.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode=optim_conf["plateau_mode"], factor=0.5, patience=optim_conf["plateau_patience"], min_lr=optim_conf["min_lr"]),
             ])
         ], milestones=[optim_conf["warmup_steps"]])
 

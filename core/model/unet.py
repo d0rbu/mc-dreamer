@@ -1,7 +1,5 @@
-import torch as th
 import torch.nn as nn
-
-from core.model.components.adapter import ConvAdapter, ConvLinearAdapter
+from core.model.components.adapter import ConvAdapter3D, ConvLinearAdapter3D
 from core.model.components.convolution import Upsample3D, Downsample3D, ConvTimeRes3D
 from modular_diffusion.diffusion.module.components.embedding import TimeEmbedding
 from modular_diffusion.diffusion.module.components.attention import EfficientAttention
@@ -68,7 +66,7 @@ class Unet3D(UNet):
             'pre_norm'  : True,
         }
 
-        qkv_adapt = ConvLinearAdapter if exists(ctrl_dim) else ConvAdapter
+        qkv_adapt = ConvLinearAdapter3D if exists(ctrl_dim) else ConvAdapter3D
 
         # Build up the downsampling module
         for idx, (dim_in, dim_out) in enumerate(dims):
