@@ -212,14 +212,20 @@ class ColorModule(BitDiffusion):
                 x_c.detach_()
 
         x_p = self.predict(x_t, sig, x_c = x_c, ctrl = ctrl)
-        structure = structure.expand(bs, bits, *structure.shape[2:])  # Expand to match the input shape
+        structure = structure.expand(bs, bits, *structure.shape[2:])  # (B, N, Y, Z, X)
 
         # Compute the distribution loss ONLY for blocks that are solid in the structures
-        loss = self.criterion(x_p[structure], x_0[structure], reduction = "mean")
+        loss = self.criterion(x_p[structure], x_0[structure], reduction = "none")  # (D)
 
-        # Add loss weight
-        loss *= self.loss_weight(sig)
-        return loss
+        batch_loss_weight = self.loss_weight(sig)  # (B)
+        bit_loss_weight = th.repeat_interleave(batch_loss_weight, bits)  # (B * N)
+        structure_block_sizes = structure.sum(dim=[-1, -2, -3]).flatten()  # (B, N)
+
+        block_loss_weight = th.repeat_interleave(bit_loss_weight, structure_block_sizes)  # (D)
+
+        # Add loss weight (fixed to be by block instead of by batch)
+        loss *= block_loss_weight
+        return loss.mean()
 
     @classmethod
     def int2bit(cls, decs : th.Tensor, nbits : int = 8, scale : float = 1.) -> th.Tensor:
