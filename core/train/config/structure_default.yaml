@@ -21,8 +21,10 @@ DATASET:
   batch_size: 64
   tube_length: 8
 TRAINING:
+  mode: structure
   accumulate_grad_batches: 8
   precision: 16
   accelerator: gpu
   steps: -1  # infinite
   val_check_interval: 1000
+  ckpt_dir: checkpoints
