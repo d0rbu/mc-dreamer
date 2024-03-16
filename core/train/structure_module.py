@@ -176,7 +176,7 @@ class StructureModule(L.LightningModule):
 
         self.log("val_loss", outputs.loss.item(), on_step=True, batch_size=batch_size)
         self.log("val_acc", acc, on_step=True, batch_size=batch_size)
-    
+
     def lr_scheduler_step(self, scheduler: th.optim.lr_scheduler.LRScheduler, metric: Any | None) -> None:
         scheduler.step(epoch=self.global_step, metrics=metric)
 

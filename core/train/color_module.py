@@ -7,7 +7,7 @@ from modular_diffusion.diffusion.discrete import BitDiffusion
 from modular_diffusion.diffusion.module.utils.misc import default, exists, enlarge_as
 from random import random
 from core.model.unet import Unet3D
-from typing import Callable, Optional, Self
+from typing import Callable, Optional, Self, Any
 from core.scheduler import SequentialLR, ChainedScheduler, step_scheduler
 
 
@@ -265,6 +265,9 @@ class ColorModule(BitDiffusion):
 
         return decs.clamp(0, 255)
 
+    def lr_scheduler_step(self, scheduler: th.optim.lr_scheduler.LRScheduler, metric: Any | None) -> None:
+        scheduler.step(epoch=self.global_step, metrics=metric)
+
     def configure_optimizers(self) -> tuple[list]:
         optim_conf = self.conf["OPTIMIZER"]
 
@@ -273,7 +276,7 @@ class ColorModule(BitDiffusion):
             th.optim.lr_scheduler.LinearLR(optimizer, start_factor=1/optim_conf["warmup_steps"], total_iters=optim_conf["warmup_steps"]),
             ChainedScheduler([
                 th.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=optim_conf["restart_interval"], T_mult=2, eta_min=optim_conf["min_lr"]),
-                th.optim.lr_scheduler.MultiplicativeLR(optimizer, lr_lambda=lambda step: optim_conf["lr_decay"] ** (math.floor(math.log2(step/self.restart_interval + 1)))),
+                th.optim.lr_scheduler.MultiplicativeLR(optimizer, lr_lambda=lambda step: optim_conf["lr_decay"] ** (math.floor(math.log2(step/optim_conf["restart_interval"] + 1)))),
                 th.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode=optim_conf["plateau_mode"], factor=0.5, patience=optim_conf["plateau_patience"], min_lr=optim_conf["min_lr"]),
             ])
         ], milestones=[optim_conf["warmup_steps"]])

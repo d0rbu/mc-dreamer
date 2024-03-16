@@ -1,7 +1,11 @@
 MODEL:
-  net_dim: 8
+  net_dim: 40
   channels: 8
-  ctrl_dim: 256
+  attn_dim: 512
+  num_group: 1
+  chn_mult: [1, 2, 4, 8, 16]
+  num_heads: 8
+  ctrl_dim: 512
 DIFFUSION:
   img_size: [16, 16, 16]
   num_bits: 8
@@ -15,7 +19,6 @@ OPTIMIZER:
   plateau_patience: 10
 DATASET:
   batch_size: 64
-  tube_length: 8
 TRAINING:
   mode: color
   accumulate_grad_batches: 8

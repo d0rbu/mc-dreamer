@@ -45,13 +45,15 @@ class ConvTimeRes3D(ConvTimeRes):
 
         self.conv1 = nn.Sequential(
             nn.Conv3d(inp_dim, hid_dim, kernel_size = 3, padding = 1),
-            nn.GroupNorm(num_group, hid_dim),
+            # nn.GroupNorm(num_group, hid_dim),
+            nn.BatchNorm3d(hid_dim),
             nn.SiLU(inplace = False),
         )
 
         self.conv2 = nn.Sequential(
             nn.Conv3d(hid_dim, out_dim, kernel_size = 3, padding = 1),
-            nn.GroupNorm(num_group, out_dim),
+            # nn.GroupNorm(num_group, out_dim),
+            nn.BatchNorm3d(hid_dim),
             nn.SiLU(inplace = False),
         )
 
