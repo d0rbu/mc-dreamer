@@ -10,12 +10,12 @@ MODEL:
   eos_token_id: 2
   num_special_tokens: 3
 OPTIMIZER:
-  lr: 0.0008
-  wd: 0.0008
+  lr: 0.0006
+  wd: 0.01
   warmup_steps: 1000
   restart_interval: 1000
   lr_decay: 0.9
-  min_lr: 0.00001
+  min_lr: 0.00006
   plateau_patience: 10
 DATASET:
   batch_size: 64
@@ -24,6 +24,7 @@ TRAINING:
   mode: structure
   accumulate_grad_batches: 8
   precision: 16
+  gradient_clip_val: 1.0
   accelerator: gpu
   steps: -1  # infinite
   val_check_interval: 1000
