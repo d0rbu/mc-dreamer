@@ -172,6 +172,45 @@ class ColorModule(BitDiffusion):
         super().__init__(**kwargs)
 
         self.ctrl_emb = ControlEmbedder(ctrl_dim)
+    
+    def validation_step(self, batch : dict[str, th.Tensor], batch_idx : int) -> th.Tensor:
+        # Extract the starting images from data batch
+        x_0  = batch[self.data_key]
+        ctrl = batch[self.ctrl_key] if exists(self.ctrl_key) else None
+
+        loss = self.compute_loss(x_0, ctrl = ctrl)
+
+        self.log_dict({'val_loss' : loss}, logger = True, on_step = True, sync_dist = True)
+
+        self.val_outs = ((x_0, ctrl),)
+
+        return self.val_outs
+
+    @th.no_grad()
+    def on_validation_epoch_end(self) -> None:
+        '''
+            At the end of the validation cycle, we inspect how the denoising
+            procedure is doing by sampling novel images from the learn distribution.
+        '''
+        
+        val_outs: tuple[th.Tensor, ...] = self.val_outs
+
+        # Collect the input shapes
+        (x_0, ctrl), *_ = val_outs
+
+        # # Produce 8 samples and log them
+        # imgs = self(
+        #         num_imgs = 8,
+        #         ctrl = ctrl,
+        #         verbose = False,
+        #     )
+        
+        # assert not torch.isnan(imgs).any(), 'NaNs detected in imgs!'
+
+        # imgs = make_grid(imgs, nrow = 4)
+
+        # # Log images using the default TensorBoard logger
+        # self.logger.experiment.add_image(self.log_img_key, imgs, global_step = self.global_step)
 
     def compute_loss(
         self: Self,
