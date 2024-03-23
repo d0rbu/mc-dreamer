@@ -102,7 +102,13 @@ class StructureModule(L.LightningModule):
         self: Self,
         x: th.Tensor,
     ) -> th.Tensor:
-        return (x - self.NUM_SPECIAL_TOKENS) @ self._idx_to_tube
+        tubes = th.empty((*x.shape, self.tube_length), dtype=th.long, device=x.device)
+        special_tokens_mask = x < self.NUM_SPECIAL_TOKENS
+
+        tubes[special_tokens_mask] = -1
+        tubes[~special_tokens_mask] = (x[~special_tokens_mask] - self.NUM_SPECIAL_TOKENS @ self._idx_to_tube)
+        
+        return tubes
 
     def forward(
         self: Self,
@@ -111,40 +117,44 @@ class StructureModule(L.LightningModule):
         **kwargs: dict[str, Any],
     ) -> tuple | CausalLMOutputWithPast:
         return self.model(x, y_indices, **kwargs)
-    
-    def _tube_batch_to_sequence(self, structure: th.Tensor, prev_tube: th.Tensor, next_tube: th.Tensor) -> th.Tensor:
+
+    def _tube_batch_to_sequence(self, structure: th.Tensor, prev_tube: th.Tensor | None, next_tube: th.Tensor | None) -> th.Tensor:
         batch_size = structure.shape[0]
 
-        bos_tube_mask = prev_tube[..., 0] == -1
-        num_bos_tubes = bos_tube_mask.sum()
+        if prev_tube is None:
+            prev_token = th.empty((batch_size, 0), dtype=th.long, device=structure.device)
+        else:
+            bos_tube_mask = prev_tube[..., 0] == -1
+            num_bos_tubes = bos_tube_mask.sum()
 
-        if num_bos_tubes < batch_size:
-            print("found non starting sample!!")
+            if num_bos_tubes < batch_size:
+                print("found non starting sample!!")
 
-        prev_token = self.tube_to_idx(prev_tube)  # (B, tube_length) -> (B, 1)  [index of token type]
-        if num_bos_tubes > 0:
-            prev_token[bos_tube_mask] = self.model.config.bos_token_id  # (B, tube_length,) -> (B, tube_length)
+            prev_token = self.tube_to_idx(prev_tube)  # (B, tube_length) -> (B, 1)  [index of token type]
+            if num_bos_tubes > 0:
+                prev_token[bos_tube_mask] = self.model.config.bos_token_id  # (B, tube_length,) -> (B, tube_length)
 
+        if next_tube is None:
+            next_token = th.empty((batch_size, 0), dtype=th.long, device=structure.device)
+        else:
+            eos_tube_mask = next_tube[..., 0] == -1
+            num_eos_tubes = eos_tube_mask.sum()
 
-        eos_tube_mask = next_tube[..., 0] == -1
-        num_eos_tubes = eos_tube_mask.sum()
+            if num_eos_tubes < batch_size:
+                print("found non ending sample!!")
 
-        if num_eos_tubes < batch_size:
-            print("found non ending sample!!")
-
-        next_token = self.tube_to_idx(next_tube)  # (B, tube_length) -> (B, 1)  [index of token type]
-        if num_eos_tubes > 0:
-            next_token[eos_tube_mask] = self.model.config.eos_token_id  # (B, tube_length,) -> (B, tube_length)
-
+            next_token = self.tube_to_idx(next_tube)  # (B, tube_length) -> (B, 1)  [index of token type]
+            if num_eos_tubes > 0:
+                next_token[eos_tube_mask] = self.model.config.eos_token_id  # (B, tube_length,) -> (B, tube_length)
 
         sequence = th.cat(
             (
                 prev_token.unsqueeze(-1),
-                self.tube_to_idx(structure.view(batch_size, self.tubes_per_sample, self.tube_length)).squeeze(),
+                self.tube_to_idx(structure.view(batch_size, self.tubes_per_sample, self.tube_length)).squeeze(-1),
                 next_token.unsqueeze(-1),
             ),
             dim=1,
-        )  # (B, Y, Z, X) -> (B, T + 2) [index of token type]
+        )  # (B, Y, Z, X) -> (B, T (+2)) [index of token type]
 
         del structure, next_tube, next_token, prev_tube, prev_token  # free up memory
         th.cuda.empty_cache()
