@@ -1,4 +1,5 @@
 import json
+import argparse
 import torch as th
 import torch.nn.functional as F
 from fastapi import Request, FastAPI
@@ -7,9 +8,12 @@ from core.train.structure_module import StructureModule
 from typing import AsyncGenerator
 
 
-CHECKPOINT_PATH = "model.ckpt"
+parser = argparse.ArgumentParser()
+parser.add_argument("--ckpt", type=str, default="checkpoints/last.ckpt")
 
-model = StructureModule.load_from_checkpoint(CHECKPOINT_PATH)
+args = parser.parse_args()
+
+model = StructureModule.load_from_checkpoint(args.ckpt)
 model.eval()
 
 app = FastAPI()
