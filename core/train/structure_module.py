@@ -2,6 +2,7 @@ import math
 import yaml
 import lightning as L
 import torch as th
+import torch.nn.functional as F
 from typing import Self, Any
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from core.model.sinkformer import SinkFormerConfig, CausalSinkFormer
@@ -87,7 +88,7 @@ class StructureModule(L.LightningModule):
         self._idx_to_tube = {
             self._cpu: generate_binary_mapping(self.num_tube_types, self.tube_length)  # (num_tube_types, tube_length)
         }
-    
+
     def tube_to_idx(
         self: Self,
         x: th.Tensor,
@@ -97,16 +98,22 @@ class StructureModule(L.LightningModule):
             self._tube_to_idx[x.device] = tube_to_idx
 
         return (x.float() @ tube_to_idx).long() + self.NUM_SPECIAL_TOKENS
-    
+
     def idx_to_tube(
         self: Self,
         x: th.Tensor,
     ) -> th.Tensor:
+        if (idx_to_tube := self._idx_to_tube.get(x.device, None)) is None:
+            idx_to_tube = self._idx_to_tube[self._cpu].to(x.device)
+            self._idx_to_tube[x.device] = idx_to_tube
+
         tubes = th.empty((*x.shape, self.tube_length), dtype=th.long, device=x.device)
         special_tokens_mask = x < self.NUM_SPECIAL_TOKENS
 
         tubes[special_tokens_mask] = -1
-        tubes[~special_tokens_mask] = (x[~special_tokens_mask] - self.NUM_SPECIAL_TOKENS @ self._idx_to_tube)
+
+        one_hot_indices = F.one_hot((x[~special_tokens_mask] - self.NUM_SPECIAL_TOKENS), self.model.config.vocab_size - self.model.config.num_special_tokens)
+        tubes[~special_tokens_mask] = (one_hot_indices @ idx_to_tube)
         
         return tubes
 
@@ -118,11 +125,15 @@ class StructureModule(L.LightningModule):
     ) -> tuple | CausalLMOutputWithPast:
         return self.model(x, y_indices, **kwargs)
 
-    def _tube_batch_to_sequence(self, structure: th.Tensor, prev_tube: th.Tensor | None, next_tube: th.Tensor | None) -> th.Tensor:
+    def _tube_batch_to_sequence(self, structure: th.Tensor, prev_tube: th.Tensor | None = None, next_tube: th.Tensor | None = None) -> th.Tensor:
         batch_size = structure.shape[0]
 
+        main_sequence = [self.tube_to_idx(structure.view(batch_size, -1, self.tube_length))]
+        if len(main_sequence[0].shape) != 2:
+            main_sequence[0] = main_sequence[0].squeeze(-1)
+
         if prev_tube is None:
-            prev_token = th.empty((batch_size, 0), dtype=th.long, device=structure.device)
+            prev_token = None
         else:
             bos_tube_mask = prev_tube[..., 0] == -1
             num_bos_tubes = bos_tube_mask.sum()
@@ -134,8 +145,10 @@ class StructureModule(L.LightningModule):
             if num_bos_tubes > 0:
                 prev_token[bos_tube_mask] = self.model.config.bos_token_id  # (B, tube_length,) -> (B, tube_length)
 
+            main_sequence.insert(0, prev_token.unsqueeze(-1))
+
         if next_tube is None:
-            next_token = th.empty((batch_size, 0), dtype=th.long, device=structure.device)
+            next_token = None
         else:
             eos_tube_mask = next_tube[..., 0] == -1
             num_eos_tubes = eos_tube_mask.sum()
@@ -147,12 +160,10 @@ class StructureModule(L.LightningModule):
             if num_eos_tubes > 0:
                 next_token[eos_tube_mask] = self.model.config.eos_token_id  # (B, tube_length,) -> (B, tube_length)
 
+            main_sequence.append(next_token.unsqueeze(-1))
+
         sequence = th.cat(
-            (
-                prev_token.unsqueeze(-1),
-                self.tube_to_idx(structure.view(batch_size, self.tubes_per_sample, self.tube_length)).squeeze(-1),
-                next_token.unsqueeze(-1),
-            ),
+            main_sequence,
             dim=1,
         )  # (B, Y, Z, X) -> (B, T (+2)) [index of token type]
 

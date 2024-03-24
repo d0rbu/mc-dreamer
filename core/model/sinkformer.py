@@ -79,7 +79,7 @@ class SinkFormer(LlamaModel):
                 (isinstance(past_key_values, DynamicCache) and past_key_values.seen_tokens == 0):
             batch_size = input_ids.shape[0]
             past_key_values = [[*self.sink_key_values[layer_idx].expand(-1, batch_size, -1, -1, -1)] for layer_idx in range(self.config.num_hidden_layers)]
-        
+
         if "use_cache" in kwargs:
             del kwargs["use_cache"]
 
