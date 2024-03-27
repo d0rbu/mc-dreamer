@@ -1,8 +1,10 @@
 import json
+import os
 import argparse
 import uvicorn
 import torch as th
 import torch.nn.functional as F
+from functools import partial
 from pyngrok import ngrok
 from fastapi import Request, FastAPI
 from fastapi.responses import StreamingResponse
@@ -12,8 +14,8 @@ from typing import AsyncGenerator
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--ckpt", type=str, default="checkpoints/last.ckpt")
-parser.add_argument("--config", type=str, default="core/train/config/structure_default.yaml")
+parser.add_argument("--ckpt", type=str, default=os.path.join("checkpoints", "epoch=0-step=6000.ckpt"))
+parser.add_argument("--config", type=str, default=os.path.join("core", "train", "config", "structure_default.yaml"))
 
 args = parser.parse_args()
 
@@ -39,11 +41,46 @@ print("Setting up ngrok tunnel...")
 http_tunnel = ngrok.connect("8001", "http")
 print(http_tunnel)
 
-async def structure_generation(data: list[list[bool] | None], y: int) -> AsyncGenerator[list[bool], None]:
+def greedy(probs: th.Tensor) -> th.Tensor:
+    return th.argmax(probs, dim=-1)
+
+def sample(probs: th.Tensor) -> th.Tensor:
+    return th.multinomial(probs, num_samples=1)
+
+def topk(k: int, probs: th.Tensor) -> th.Tensor:
+    topk_probs, topk_indices = th.topk(probs, k, dim=-1)
+    topk_probs /= topk_probs.sum(dim=-1, keepdim=True)
+
+    return th.multinomial(topk_probs, num_samples=1)
+
+def nucleus(p: float, probs: th.Tensor) -> th.Tensor:
+    sorted_probs, sorted_indices = th.sort(probs, descending=True, dim=-1)
+    sorted_probs = th.cumsum(sorted_probs, dim=-1)
+    sorted_indices = sorted_indices[sorted_probs < p]
+
+    return th.multinomial(probs[sorted_indices], num_samples=1)
+
+sampling_strategies = {
+    "greedy": greedy,
+    "sample": sample,
+    "topk": topk,
+    "nucleus": nucleus
+}
+
+async def structure_generation(data: list[list[bool | None]], y: int, sampling_strategy: dict) -> AsyncGenerator[list[bool], None]:
     # first element in the list that are none
-    indices_to_generate = [i for i, x in enumerate(data) if x is None]
+    indices_to_generate = [i for i, x in enumerate(data) if None in x]
     if len(indices_to_generate) == 0:
         return
+    
+    strategy_name = sampling_strategy.get("strategy", "greedy")
+    
+    if strategy_name == "topk":
+        sampling_fn = partial(sampling_strategies[strategy_name], sampling_strategy["k"])
+    elif strategy_name == "nucleus":
+        sampling_fn = partial(sampling_strategies[strategy_name], sampling_strategy["p"])
+    else:
+        sampling_fn = sampling_strategies[strategy_name]
 
     bos_tube = th.full((1, model.tube_length), -1, dtype=th.float, device=model.device)
     current_sequence = data[:indices_to_generate[0]]  # add the known data
@@ -57,7 +94,18 @@ async def structure_generation(data: list[list[bool] | None], y: int) -> AsyncGe
         output = model(current_sequence, y_indices, use_cache=True, past_key_values=cache)
         cache = output.past_key_values
         distribution = F.softmax(output.logits[0, -1], dim=-1)
-        next_token = th.multinomial(distribution, num_samples=1).item()
+        next_token = sampling_fn(distribution)
+        next_token = th.tensor([[next_token.item()]], device=model.device)
+
+        original_tube = data[i]
+        tube = model.idx_to_tube(next_token).squeeze(0).tolist()
+
+        yield f"{json.dumps(tube)}\n"
+
+        # replace the None values with the generated tube
+        tube = [original_tube[k] if original_tube[k] is not None else tube[k] for k in range(len(tube))]
+        tube = th.tensor(tube, dtype=th.float, device=model.device).unsqueeze(0)
+        next_token = model.tube_to_idx(tube)
 
         if j < len(indices_to_generate) - 1:
             next_i = indices_to_generate[j + 1]
@@ -65,15 +113,12 @@ async def structure_generation(data: list[list[bool] | None], y: int) -> AsyncGe
             next_sequence = th.tensor(next_sequence, dtype=th.float, device=model.device).unsqueeze(0)
             next_sequence = model._tube_batch_to_sequence(next_sequence)
 
-            current_sequence = th.cat([th.tensor([[next_token]], device=model.device), next_sequence], dim=1)
-
-        tube = model.idx_to_tube(th.tensor([[next_token]], device=model.device)).squeeze(0).tolist()
-        yield f"{json.dumps(tube)}\n"
+            current_sequence = th.cat([next_token, next_sequence], dim=1)
 
 @app.post("/structure")
 async def get_structure(request: Request):
     data = await request.json()
-    return StreamingResponse(structure_generation(data["data"], data["y"]))
+    return StreamingResponse(structure_generation(data["data"], data["y"], data["sampling"]))
 
 
 if __name__ == '__main__':
