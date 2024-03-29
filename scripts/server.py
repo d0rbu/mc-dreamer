@@ -51,14 +51,18 @@ def topk(k: int, probs: th.Tensor) -> th.Tensor:
     topk_probs, topk_indices = th.topk(probs, k, dim=-1)
     topk_probs /= topk_probs.sum(dim=-1, keepdim=True)
 
-    return th.multinomial(topk_probs, num_samples=1)
+    samples = th.multinomial(topk_probs, num_samples=1)
+
+    return topk_indices.gather(-1, samples)
 
 def nucleus(p: float, probs: th.Tensor) -> th.Tensor:
     sorted_probs, sorted_indices = th.sort(probs, descending=True, dim=-1)
     sorted_probs = th.cumsum(sorted_probs, dim=-1)
     sorted_indices = sorted_indices[sorted_probs < p]
 
-    return th.multinomial(probs[sorted_indices], num_samples=1)
+    samples = th.multinomial(probs[sorted_indices], num_samples=1)
+
+    return sorted_indices[samples]
 
 sampling_strategies = {
     "greedy": greedy,
@@ -105,6 +109,10 @@ async def structure_generation(data: list[list[bool | None]], y: int, sampling_s
         # replace the None values with the generated tube
         tube = [original_tube[k] if original_tube[k] is not None else tube[k] for k in range(len(tube))]
         tube = th.tensor(tube, dtype=th.float, device=model.device).unsqueeze(0)
+        
+        if th.all(tube == -1):  # reached the end of the sequence
+            break
+
         next_token = model.tube_to_idx(tube)
 
         if j < len(indices_to_generate) - 1:
