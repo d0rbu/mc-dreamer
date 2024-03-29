@@ -10,7 +10,7 @@ from fastapi import Request, FastAPI
 from fastapi.responses import StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
 from core.train.structure_module import StructureModule
-from typing import AsyncGenerator
+from typing import Generator
 
 
 parser = argparse.ArgumentParser()
@@ -59,6 +59,8 @@ def nucleus(p: float, probs: th.Tensor) -> th.Tensor:
     sorted_probs, sorted_indices = th.sort(probs, descending=True, dim=-1)
     sorted_probs = th.cumsum(sorted_probs, dim=-1)
     sorted_indices = sorted_indices[sorted_probs < p]
+    if sorted_indices.numel() == 0:
+        sorted_indices = th.argmax(probs, dim=-1, keepdim=True)  # if we get 0 probs in the nucleus, just take the max
 
     samples = th.multinomial(probs[sorted_indices], num_samples=1)
 
@@ -71,7 +73,7 @@ sampling_strategies = {
     "nucleus": nucleus
 }
 
-async def structure_generation(data: list[list[bool | None]], y: int, sampling_strategy: dict) -> AsyncGenerator[list[bool], None]:
+def structure_generation(data: list[list[bool | None]], y: int, sampling_strategy: dict) -> Generator[str, None, None]:
     # first element in the list that are none
     indices_to_generate = [i for i, x in enumerate(data) if None in x]
     if len(indices_to_generate) == 0:
