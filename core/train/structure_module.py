@@ -113,7 +113,12 @@ class StructureModule(L.LightningModule):
         tubes[special_tokens_mask] = -1
 
         one_hot_indices = F.one_hot((x[~special_tokens_mask] - self.NUM_SPECIAL_TOKENS), self.model.config.vocab_size - self.model.config.num_special_tokens)
-        tubes[~special_tokens_mask] = (one_hot_indices @ idx_to_tube)
+        if x.device == self._cpu:
+            tubes[~special_tokens_mask] = (one_hot_indices @ idx_to_tube)
+        else:  # addmm_cuda not implemented for long
+            one_hot_indices = one_hot_indices.float()
+            idx_to_tube = idx_to_tube.float()
+            tubes[~special_tokens_mask] = (one_hot_indices @ idx_to_tube).long()
         
         return tubes
 

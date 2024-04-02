@@ -23,6 +23,7 @@ print("Loading model...")
 model = StructureModule.from_conf(args.config)
 ckpt = th.load(args.ckpt)
 model.load_state_dict(ckpt["state_dict"])
+model.cuda()
 model.eval()
 
 del ckpt
