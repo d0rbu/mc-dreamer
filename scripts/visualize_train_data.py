@@ -16,7 +16,7 @@ def get_percentile_scores(
         if not files:
             continue
 
-        for file in files:
+        for file in tqdm(files, leave=False, total=len(files)):
             if not file.endswith(".pt"):
                 continue
 
@@ -28,6 +28,7 @@ def get_percentile_scores(
             for i in tqdm(score_indices, total=len(score_indices), leave=False, desc=file):
                 full_scores.append((file_path, i, scores[i]))
 
+    print("Sorting scores...")
     full_scores = sorted(full_scores, key=lambda x: x[1])
     num_samples = len(full_scores)
     percentiles = percentiles * num_samples
@@ -109,7 +110,7 @@ def convert_percentiles(
 
     loaded_samples = {}
 
-    for file_path, i, score in tqdm(selected_scores, desc="Gathering schematics"):
+    for file_path, i, score in tqdm(selected_scores, desc="Gathering schematics", total=len(selected_scores)):
         if file_path in loaded_samples:
             samples = loaded_samples[file_path]
         else:

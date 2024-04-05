@@ -32,6 +32,7 @@ with open(BLOCK_MAP_PATH, "r") as f:
     BLOCK_MAP.update(underscore_block_map)
 
 COMM = MPI.COMM_WORLD
+RANK = COMM.Get_rank()
 
 def block_name_to_id(block_name: str) -> int:
     return anvil.Block.from_name(block_name).id()
@@ -63,7 +64,7 @@ def extract_from_ndarray(
     running_integral = np.zeros((sample_size[0] + 1, *dense_array.shape[1:], NUM_BLOCKS), dtype=np.uintc)
 
     x_generator = range(dense_array.shape[0])
-    if COMM.Get_rank() == 0:
+    if RANK == 0:
         x_generator = tqdm(x_generator, total=dense_array.shape[0], leave=False, desc="Scoring samples")
 
     for x in x_generator:
@@ -215,7 +216,7 @@ def save_samples(
 _print = print
 # only print from rank 0
 def print(*args, **kwargs):
-    if COMM.Get_rank() == 0:
+    if RANK == 0:
         _print(*args, **kwargs)
 
 def extract_world(
@@ -232,20 +233,19 @@ def extract_world(
     region_dir = os.path.join(path, "region")
     available_regions, region_indices = get_available_regions(region_dir)
 
-    rank = COMM.Get_rank()
     world_size = COMM.Get_size()
     os.makedirs(output_dir, exist_ok=True)
 
     region_index_chunk_generator = chunked(region_indices, world_size)
 
-    if COMM.Get_rank() == 0:
+    if RANK == 0:
         region_index_chunk_generator = tqdm(region_index_chunk_generator, total=available_regions.sum() // world_size, leave=False, desc="Extracting samples from regions")
 
     for region_index_chunk in region_index_chunk_generator:
-        if len(region_index_chunk) <= rank:  # no more work left for us this iteration!
+        if len(region_index_chunk) <= RANK:  # no more work left for us this iteration!
             break
 
-        x, z = region_index_chunk[rank]
+        x, z = region_index_chunk[RANK]
         region_name = f"r.{x}.{z}"
         filename = sample_filename(region_name, sample_size)
 
@@ -272,11 +272,11 @@ def extract_world(
 
     unprocessed_samples = {}
     for sample_index_chunk in chunked(np.nonzero(vertical_edge_region_samples), world_size):
-        if len(sample_index_chunk) <= rank:  # no more work left for us this iteration!
+        if len(sample_index_chunk) <= RANK:  # no more work left for us this iteration!
             break
 
-        x = sample_index_chunk[rank][0]
-        z = sample_index_chunk[rank][1]
+        x = sample_index_chunk[RANK][0]
+        z = sample_index_chunk[RANK][1]
         file_paths = (
             os.path.join(region_dir, f"r.{x}.{z}.npy"),
             os.path.join(region_dir, f"r.{x + 1}.{z}.npy"),
@@ -289,11 +289,11 @@ def extract_world(
             np.save(new_file_path, unprocessed_samples[new_file_path])
 
     for sample_index_chunk in chunked(np.nonzero(horizontal_edge_region_samples), world_size):
-        if len(sample_index_chunk) <= rank:  # no more work left for us this iteration!
+        if len(sample_index_chunk) <= RANK:  # no more work left for us this iteration!
             break
 
-        x = sample_index_chunk[rank][0]
-        z = sample_index_chunk[rank][1]
+        x = sample_index_chunk[RANK][0]
+        z = sample_index_chunk[RANK][1]
         file_paths = (
             os.path.join(region_dir, f"r.{x}.{z}.npy"),
             os.path.join(region_dir, f"r.{x}.{z + 1}.npy"),
@@ -306,11 +306,11 @@ def extract_world(
             np.save(new_file_path, unprocessed_samples[new_file_path])
 
     for sample_index_chunk in chunked(np.nonzero(corner_region_samples), world_size):
-        if len(sample_index_chunk) <= rank:  # no more work left for us this iteration!
+        if len(sample_index_chunk) <= RANK:  # no more work left for us this iteration!
             break
 
-        x = sample_index_chunk[rank][0]
-        z = sample_index_chunk[rank][1]
+        x = sample_index_chunk[RANK][0]
+        z = sample_index_chunk[RANK][1]
         file_paths = (
             os.path.join(region_dir, f"r.{x}.{z}.npy"),
             os.path.join(region_dir, f"r.{x + 1}.{z}.npy"),
@@ -341,23 +341,34 @@ def extract_zipped_world(
     path: str | os.PathLike,
     intermediate_output_dir: str | os.PathLike = "intermediate_outputs",
 ) -> os.PathLike:
-    path_no_ext, ext = os.path.splitext(path)
-    assert ext == ".zip", "File must be a zip file"
+    if RANK == 0:
+        path_no_ext, ext = os.path.splitext(path)
+        assert ext == ".zip", "File must be a zip file"
 
-    name = os.path.basename(path_no_ext)
+        name = os.path.basename(path_no_ext)
 
-    world_parent_dir = os.path.join(intermediate_output_dir, name)
-    os.makedirs(world_parent_dir, exist_ok=True)
-    with zipfile.ZipFile(path, "r") as zip_ref:
-        zip_ref.extractall(world_parent_dir)
-    
-    for world_dir in chain((world_parent_dir,), os.listdir(world_parent_dir)):  # only get the extracted world directory from the zip
-        world_path = os.path.join(world_parent_dir, world_dir)
-        if not os.path.isdir(world_path):
-            continue
+        world_parent_dir = os.path.join(intermediate_output_dir, name)
+        os.makedirs(world_parent_dir, exist_ok=True)
+        with zipfile.ZipFile(path, "r") as zip_ref:
+            zip_ref.extractall(world_parent_dir)
+
+        world_path_found = False
+        for world_dir in chain((world_parent_dir,), os.listdir(world_parent_dir)):  # only get the extracted world directory from the zip
+            world_path = os.path.join(world_parent_dir, world_dir)
+            if not os.path.isdir(world_path):
+                continue
+            
+            level_dat_path = os.path.join(world_path, "level.dat")
+            if os.path.exists(level_dat_path):
+                world_path_found = True
+                break
         
-        level_dat_path = os.path.join(world_path, "level.dat")
-        if os.path.exists(level_dat_path):
-            return world_path
-    
-    raise Exception(f"No level.dat file found in {world_parent_dir} or its child directories")
+        if not world_path_found:
+            raise Exception(f"No level.dat file found in {world_parent_dir} or its child directories")
+    else:
+        world_path = None  # placeholder for non-rank 0 processes
+
+    # broadcast world path from rank 0
+    world_path = COMM.bcast(world_path if RANK == 0 else None, root=0)
+
+    return world_path

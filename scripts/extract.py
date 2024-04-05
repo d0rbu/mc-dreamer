@@ -10,7 +10,7 @@ def extract_data(
         file_path = os.path.join(raw_output_dir, file)
         if not os.path.isfile(file_path):
             continue
-        
+
         if file.endswith(".zip") or os.path.isdir(file_path):
             extract_world(file_path, output_dir)
         else:
