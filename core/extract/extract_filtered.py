@@ -7,7 +7,7 @@ from mpi4py import MPI
 from itertools import product
 from more_itertools import chunked
 from typing import Sequence
-from core.extract.extract import extract_zipped_world, get_available_regions, sample_filename, print, save_samples, REGION_BLOCK_LENGTH, REGION_LENGTH, CHUNK_HEIGHT, CHUNK_LENGTH, BLOCK_MAP
+from core.extract.extract import extract_zipped_world, get_available_regions, print, save_samples, REGION_BLOCK_LENGTH, REGION_LENGTH, CHUNK_HEIGHT, CHUNK_LENGTH, BLOCK_MAP
 from core.extract.filters.filter import Filter
 
 
@@ -56,9 +56,12 @@ def extract_world(
 
         for filter in filters:
             new_mask = filter(tensor_blocks, current_mask)
+            if current_mask is not None:
+                new_mask &= current_mask
 
             tensor_blocks, current_mask = shrink_blocks(tensor_blocks, new_mask)
 
+        current_mask = dilate_erode(current_mask)
         save_samples(tensor_blocks, current_mask, output_dir, filename)
 
     print(f"{RANK} done!")
@@ -68,7 +71,14 @@ def shrink_blocks(
     filter: th.Tensor | None,
 ) -> th.Tensor:
     # squeeze dimensions if, for example, the entire top layer is 0 in the filter
+    # TODO: implement shrinking
     return tensor_blocks, filter
+
+def dilate_erode(
+    mask: th.Tensor[th.bool]
+) -> th.Tensor[th.bool]:
+    # TODO: implement dilation and erosion, probably dilate by 64 blocks and erode by 48 or something
+    return mask
 
 def region_to_tensor(
     file_path: str | os.PathLike,
