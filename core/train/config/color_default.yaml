@@ -10,7 +10,7 @@ DIFFUSION:
   img_size: [16, 16, 16]
   num_bits: 8
 OPTIMIZER:
-  lr: 0.0003
+  lr: 0.0001
   wd: 0.01
   warmup_steps: 1000
   restart_interval: 1000
@@ -21,7 +21,7 @@ DATASET:
   batch_size: 128
 TRAINING:
   mode: color
-  accumulate_grad_batches: 4
+  accumulate_grad_batches: 8
   precision: 16
   gradient_clip_val: 1.0
   accelerator: gpu

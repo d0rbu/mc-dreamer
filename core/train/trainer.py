@@ -44,7 +44,7 @@ def train(args: argparse.Namespace) -> None:
     best_ckpt_callback = ModelCheckpoint(dirpath=args.ckpt_dir, monitor="val_loss_epoch", save_top_k=1, mode="min")
     last_ckpt_callback = ModelCheckpoint(dirpath=args.ckpt_dir, monitor="step", every_n_train_steps=args.val_check_interval, save_top_k=1, mode="max", save_last="link")
     lr_callback = LearningRateMonitor(logging_interval="step")
-    logger = WandbLogger(log_model="all", project="mc-dreamer", name=f"{args.mode}_training")
+    logger = WandbLogger(log_model=False, project="mc-dreamer", name=f"{args.mode}_training")
 
     trainer = Trainer(
         logger = logger,

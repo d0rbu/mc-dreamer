@@ -28,7 +28,7 @@ def get_percentile_scores(
             for i in tqdm(score_indices, total=len(score_indices), leave=False, desc=file):
                 full_scores.append((file_path, i, scores[i]))
 
-    print("Sorting scores...")
+    print(f"Sorting {len(full_scores)} scores...")
     full_scores = sorted(full_scores, key=lambda x: x[1])
     num_samples = len(full_scores)
     percentiles = percentiles * num_samples
@@ -142,4 +142,4 @@ if __name__ == "__main__":
 
     percentiles = th.linspace(args.percentiles_min, args.percentiles_max, args.percentiles_steps)
 
-    convert_percentiles(percentiles, num_sampled=args.num_sampled, threshold=args.threshold)
+    convert_percentiles(percentiles, extraction_output_dir=args.extraction_output_dir, schematic_dir=args.schematic_dir, num_sampled=args.num_sampled, threshold=args.threshold)
