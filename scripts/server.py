@@ -4,29 +4,50 @@ import argparse
 import uvicorn
 import torch as th
 import torch.nn.functional as F
+from itertools import product
 from functools import partial
 from pyngrok import ngrok
 from fastapi import Request, FastAPI
 from fastapi.responses import StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
 from core.train.structure_module import StructureModule
+from core.train.color_module import ColorModule
 from typing import Generator
+from tqdm import tqdm
 
 
 parser = argparse.ArgumentParser()
+parser.add_argument("--only_color", action="store_true")
+parser.add_argument("--only_structure", action="store_true")
 parser.add_argument("--ckpt", type=str, default=os.path.join("checkpoints", "epoch=0-step=6000.ckpt"))
+parser.add_argument("--ckpt_color", type=str, default=os.path.join("checkpoints_color", "last.ckpt"))
 parser.add_argument("--config", type=str, default=os.path.join("core", "train", "config", "structure_default.yaml"))
+parser.add_argument("--config_color", type=str, default=os.path.join("core", "train", "config", "color_default.yaml"))
+parser.add_argument("--port", type=int, default=8001)
 
 args = parser.parse_args()
 
-print("Loading model...")
-model = StructureModule.from_conf(args.config)
-ckpt = th.load(args.ckpt)
-model.load_state_dict(ckpt["state_dict"])
-model.cuda()
-model.eval()
+assert not (args.only_color and args.only_structure), "Cannot specify both only_color and only_structure"
 
-del ckpt
+if not args.only_color:
+    print("Loading structure model...")
+    model = StructureModule.from_conf(args.config)
+    ckpt = th.load(args.ckpt)
+    model.load_state_dict(ckpt["state_dict"])
+    model.cuda()
+    model.eval()
+
+    del ckpt
+
+if not args.only_structure:
+    print("Loading color model...")
+    color_model = ColorModule.from_conf(args.config)
+    ckpt = th.load(args.ckpt)
+    color_model.load_state_dict(ckpt["state_dict"])
+    color_model.cuda()
+    color_model.eval()
+
+    del ckpt
 
 print("Setting up API...")
 app = FastAPI()
@@ -35,11 +56,11 @@ app.add_middleware(
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
 print("Setting up ngrok tunnel...")
-http_tunnel = ngrok.connect("8001", "http")
+http_tunnel = ngrok.connect(args.port, "http")
 print(http_tunnel)
 
 def greedy(probs: th.Tensor) -> th.Tensor:
@@ -130,6 +151,30 @@ def structure_generation(data: list[list[bool | None]], y: int, sampling_strateg
 async def get_structure(request: Request):
     data = await request.json()
     return StreamingResponse(structure_generation(data["data"], data["y"], data["sampling"]))
+
+
+def color_generation(data: list[list[list[list[int | None]]]], y: int, steps: int, strength: float) -> Generator[str, None, None]:
+    b_len, x_len, y_len, z_len = len(data), len(data[0]), len(data[0][0]), len(data[0][0][0])
+
+    mask = th.zeros((b_len, x_len, y_len, z_len), dtype=th.bool, device=color_model.device)
+    context_tensor = th.empty_like(mask, dtype=th.uint8, device=color_model.device)
+
+    for b, x, y, z in product(range(b_len), range(x_len), range(y_len), range(z_len)):
+        if data[b][x][y][z] is None:
+            mask[b, x, y, z] = True
+            context_tensor[b, x, y, z] = 0
+        else:
+            context_tensor[b, x, y, z] = data[b][x][y][z]
+
+    for step in tqdm(color_model.generate(context_tensor, mask, y, steps, strength), total=steps, desc="Color generation", leave=False):
+        generated_region = step[mask]
+
+        yield f"{json.dumps(generated_region.tolist())}\n"
+
+@app.post("/color")
+async def get_color(request: Request):
+    data = await request.json()
+    return StreamingResponse(color_generation(data["data"], data["y"], data["steps"], data["strength"]))
 
 
 if __name__ == '__main__':
