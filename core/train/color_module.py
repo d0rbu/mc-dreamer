@@ -7,7 +7,7 @@ from modular_diffusion.diffusion.discrete import BitDiffusion
 from modular_diffusion.diffusion.module.utils.misc import default, exists, enlarge_as
 from random import random
 from core.model.unet import Unet3D
-from typing import Callable, Optional, Self, Any
+from typing import Callable, Optional, Self, Any, Generator
 from core.scheduler import SequentialLR, ChainedScheduler, step_scheduler
 
 
@@ -172,7 +172,7 @@ class ColorModule(BitDiffusion):
         super().__init__(**kwargs)
 
         self.ctrl_emb = ControlEmbedder(ctrl_dim)
-    
+
     def validation_step(self, batch : dict[str, th.Tensor], batch_idx : int) -> th.Tensor:
         # Extract the starting images from data batch
         x_0  = batch[self.data_key]
@@ -211,6 +211,22 @@ class ColorModule(BitDiffusion):
 
         # # Log images using the default TensorBoard logger
         # self.logger.experiment.add_image(self.log_img_key, imgs, global_step = self.global_step)
+    
+    @th.no_grad()
+    def generate(
+        self: Self,
+        num_imgs: int = 1,
+        ctrl: Optional[dict[str, th.Tensor]] = None,
+        context: Optional[th.Tensor] = None,
+        generate_mask: Optional[th.Tensor] = None,
+        steps: int = 100,
+        inpaint_strength: float = 1.,
+    ) -> Generator[th.Tensor, None, None]:
+        '''
+            Generate a batch of samples from the model.
+        '''
+        
+        pass
 
     def compute_loss(
         self: Self,

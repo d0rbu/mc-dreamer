@@ -162,11 +162,16 @@ def color_generation(data: list[list[list[list[int | None]]]], y: int, steps: in
     for b, x, y, z in product(range(b_len), range(x_len), range(y_len), range(z_len)):
         if data[b][x][y][z] is None:
             mask[b, x, y, z] = True
-            context_tensor[b, x, y, z] = 0
+            context_tensor[b, x, y, z] = 1
         else:
             context_tensor[b, x, y, z] = data[b][x][y][z]
+    
+    control = {
+        "structure": context_tensor > 0,
+        "y_index": y,
+    },
 
-    for step in tqdm(color_model.generate(context_tensor, mask, y, steps, strength), total=steps, desc="Color generation", leave=False):
+    for step in tqdm(color_model.generate(1, control, context_tensor, mask, steps, strength), total=steps, desc="Color generation", leave=False):
         generated_region = step[mask]
 
         yield f"{json.dumps(generated_region.tolist())}\n"
