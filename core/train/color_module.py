@@ -226,7 +226,12 @@ class ColorModule(BitDiffusion):
             Generate a batch of samples from the model.
         '''
         
-        pass
+        if context is not None:
+            # create noise schedule for inpainting
+            sigma = self.get_timesteps(steps)
+            sigma = sigma.unsqueeze(0).repeat(num_imgs, 1)
+            sigma = sigma.to(self.device)
+            pass
 
     def compute_loss(
         self: Self,
