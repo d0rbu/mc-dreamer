@@ -10,6 +10,8 @@ from core.model.unet import Unet3D
 from typing import Callable, Optional, Self, Any, Generator
 from core.scheduler import SequentialLR, ChainedScheduler, step_scheduler
 
+INV_SQRT2 = 1. / math.sqrt(2)
+
 
 # vaswani et al 2017
 class PositionalEmbeddings(nn.Module):
@@ -180,7 +182,7 @@ class ColorModule(BitDiffusion):
 
         loss = self.compute_loss(x_0, ctrl = ctrl)
 
-        self.log_dict({'val_loss' : loss}, logger = True, on_step = True, sync_dist = True)
+        self.log_dict({"val_loss" : loss}, logger = True, on_step = True, sync_dist = True)
 
         self.val_outs = ((x_0, ctrl),)
 
@@ -188,10 +190,10 @@ class ColorModule(BitDiffusion):
 
     @th.no_grad()
     def on_validation_epoch_end(self) -> None:
-        '''
+        """
             At the end of the validation cycle, we inspect how the denoising
             procedure is doing by sampling novel images from the learn distribution.
-        '''
+        """
         
         val_outs: tuple[th.Tensor, ...] = self.val_outs
 
@@ -205,33 +207,113 @@ class ColorModule(BitDiffusion):
         #         verbose = False,
         #     )
         
-        # assert not torch.isnan(imgs).any(), 'NaNs detected in imgs!'
+        # assert not torch.isnan(imgs).any(), "NaNs detected in imgs!"
 
         # imgs = make_grid(imgs, nrow = 4)
 
         # # Log images using the default TensorBoard logger
         # self.logger.experiment.add_image(self.log_img_key, imgs, global_step = self.global_step)
-    
+
     @th.no_grad()
-    def generate(
+    def heun_sde_inpaint(
         self: Self,
-        num_imgs: int = 1,
-        ctrl: Optional[dict[str, th.Tensor]] = None,
+        shape: tuple[int,...],
+        schedule: th.Tensor,
+        scaling: th.Tensor,
+        ctrl: Optional[th.Tensor] = None,
         context: Optional[th.Tensor] = None,
-        generate_mask: Optional[th.Tensor] = None,
-        steps: int = 100,
+        mask: Optional[th.Tensor] = None,
         inpaint_strength: float = 1.,
-    ) -> Generator[th.Tensor, None, None]:
-        '''
-            Generate a batch of samples from the model.
-        '''
-        
-        if context is not None:
-            # create noise schedule for inpainting
-            sigma = self.get_timesteps(steps)
-            sigma = sigma.unsqueeze(0).repeat(num_imgs, 1)
-            sigma = sigma.to(self.device)
-            pass
+        use_x_c: Optional[bool] = None,
+        clamp: bool = False,
+        guide: float = 1.,
+        s_tmin: float = 0.05,
+        s_tmax: float = 50.,
+        s_churn: float = 80,
+        s_noise: float = 1.003,
+        verbose: bool = False
+    ) -> th.Tensor:
+        """
+            based on diffusion.py heun sde implementation
+
+            Stochastic Heun (2° order) solver from:
+            https://arxiv.org/pdf/2206.00364 (Algorithm 2)
+        """
+        assert (context is None) == (mask is None), "Context and mask must both be provided or both be None"
+        inpaint = context is not None
+
+        if inpaint:
+            assert 0 < inpaint_strength <= 1, "Inpaint strength must be in (0, 1]"
+
+        use_x_c = default(use_x_c, self.self_cond)
+
+        T = schedule.shape[0]
+
+        # compute the gamma coefficients that increase the noise level
+        gammas = th.where(
+            (schedule < s_tmin) | (schedule > s_tmax),
+            0., min(s_churn / T, INV_SQRT2)
+        )
+
+        x_c = None  # self-conditioning parameter
+        if not inpaint:
+            x_t = schedule[0] * th.randn(shape, device = schedule.device)
+        if inpaint:
+            inpaint_schedule = [context]
+
+            for last_sigma, current_sigma in zip(schedule[:-1], schedule[1:]):
+                noise = th.randn(shape, device = schedule.device)
+                sigma_delta = (current_sigma ** 2 - last_sigma ** 2) ** 0.5
+
+                latest_image = inpaint_schedule[-1]
+
+                noised_image = latest_image + sigma_delta * noise
+                inpaint_schedule.append(noised_image)
+
+            x_t = inpaint_schedule[-1]
+
+        # TODO: fix and use inpaint schedule here
+        pars = zip(groupwise(schedule, n = 2), gammas)
+        for (sig, sigp1), gamma in tqdm(pars, total = T, desc = 'Stochastic Heun', disable = not verbose):
+            # Sample additive noise
+            eps = s_noise * torch.randn_like(x_t)
+
+            # Select temporarily increased noise level sig_hat
+            sig_hat = sig * (1 + gamma)
+
+            # Add new noise to move schedule to time "hat"
+            x_hat = x_t + sqrt(sig_hat ** 2 - sig ** 2) * eps
+
+            # Evaluate dx/dt at scheduled time "hat"
+            p_hat = self.follow(x_hat, sig_hat, x_c = x_c if use_x_c else None, ctrl = ctrl, guide = guide, clamp = clamp)
+            dx_dt = (x_hat - p_hat) / sig_hat
+
+            # Take Euler step from schedule time "hat" to time + 1
+            x_t = x_hat + (sigp1 - sig_hat) * dx_dt
+
+            # Add second order correction only if schedule not finished yet
+            if sigp1 != 0:
+                # Now the conditioning can be last prediction
+                p_hat = self.follow(x_t, sigp1, x_c = x_c if use_x_c else None, ctrl = ctrl, guide = guide, clamp = clamp)
+                dxdtp = (x_t - p_hat) / sigp1
+
+                x_t = x_hat + 0.5 * (sigp1 - sig_hat) * (dx_dt + dxdtp)
+            
+            x_c = p_hat
+
+        return x_t.clamp(-1., 1.) if clamp else x_t
+
+    @property
+    def sampler(self) -> Callable:
+        solver = self.ode_solver
+        if   solver == "heun" : return self.heun
+        elif solver == "dpm++": return self.dpmpp
+        elif solver == "ddim" : return self.ddim
+        elif solver == "heun_sde": return self.heun_sde
+        elif solver == "dpm++_sde": return self.dpmpp_sde
+        elif solver == "heun_sde_inpaint": return self.heun_sde_inpaint
+        else:
+            raise ValueError(f"Unknown sampler {solver}")
 
     def compute_loss(
         self: Self,

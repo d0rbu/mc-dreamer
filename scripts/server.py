@@ -156,22 +156,22 @@ async def get_structure(request: Request):
 def color_generation(data: list[list[list[list[int | None]]]], y: int, steps: int, strength: float) -> Generator[str, None, None]:
     b_len, x_len, y_len, z_len = len(data), len(data[0]), len(data[0][0]), len(data[0][0][0])
 
-    mask = th.zeros((b_len, x_len, y_len, z_len), dtype=th.bool, device=color_model.device)
+    mask = th.zeros((b_len, y_len, z_len, x_len), dtype=th.bool, device=color_model.device)
     context_tensor = th.empty_like(mask, dtype=th.uint8, device=color_model.device)
 
     for b, x, y, z in product(range(b_len), range(x_len), range(y_len), range(z_len)):
         if data[b][x][y][z] is None:
-            mask[b, x, y, z] = True
-            context_tensor[b, x, y, z] = 1
+            mask[b, y, z, x] = True
+            context_tensor[b, y, z, x] = 1
         else:
-            context_tensor[b, x, y, z] = data[b][x][y][z]
-    
+            context_tensor[b, y, z, x] = data[b][x][y][z]
+
     control = {
         "structure": context_tensor > 0,
         "y_index": y,
     },
 
-    for step in tqdm(color_model.generate(1, control, context_tensor, mask, steps, strength), total=steps, desc="Color generation", leave=False):
+    for step in tqdm(color_model(1, steps, "heun_sde_inpaint", ctrl=control, context=context_tensor, mask=mask, inpaint_strength=strength), total=steps, desc="Color generation", leave=False):
         generated_region = step[mask]
 
         yield f"{json.dumps(generated_region.tolist())}\n"
