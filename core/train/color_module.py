@@ -2,6 +2,7 @@ import math
 import yaml
 import torch as th
 import torch.nn as nn
+from tqdm import tqdm
 from einops import rearrange, reduce
 from modular_diffusion.diffusion.discrete import BitDiffusion
 from modular_diffusion.diffusion.module.utils.misc import default, exists, enlarge_as
@@ -9,6 +10,8 @@ from random import random
 from core.model.unet import Unet3D
 from typing import Callable, Optional, Self, Any, Generator
 from core.scheduler import SequentialLR, ChainedScheduler, step_scheduler
+
+from modular_diffusion.diffusion.module.utils.misc import exists, default, enlarge_as, groupwise
 
 INV_SQRT2 = 1. / math.sqrt(2)
 
@@ -222,7 +225,7 @@ class ColorModule(BitDiffusion):
         scaling: th.Tensor,
         ctrl: Optional[th.Tensor] = None,
         context: Optional[th.Tensor] = None,
-        mask: Optional[th.Tensor] = None,
+        mask: Optional[th.BoolTensor] = None,  # mask of area to inpaint
         inpaint_strength: float = 1.,
         use_x_c: Optional[bool] = None,
         clamp: bool = False,
@@ -242,10 +245,13 @@ class ColorModule(BitDiffusion):
         assert (context is None) == (mask is None), "Context and mask must both be provided or both be None"
         inpaint = context is not None
 
+        use_x_c = default(use_x_c, self.self_cond)
+        norm_fn = default(norm_fn, self.norm_forward)
+
         if inpaint:
             assert 0 < inpaint_strength <= 1, "Inpaint strength must be in (0, 1]"
-
-        use_x_c = default(use_x_c, self.self_cond)
+            mask = ~mask  # invert mask so it is a context mask instead
+            context = norm_fn(context)  # normalize context
 
         T = schedule.shape[0]
 
@@ -272,17 +278,16 @@ class ColorModule(BitDiffusion):
 
             x_t = inpaint_schedule[-1]
 
-        # TODO: fix and use inpaint schedule here
         pars = zip(groupwise(schedule, n = 2), gammas)
         for (sig, sigp1), gamma in tqdm(pars, total = T, desc = 'Stochastic Heun', disable = not verbose):
             # Sample additive noise
-            eps = s_noise * torch.randn_like(x_t)
+            eps = s_noise * th.randn_like(x_t)
 
             # Select temporarily increased noise level sig_hat
             sig_hat = sig * (1 + gamma)
 
             # Add new noise to move schedule to time "hat"
-            x_hat = x_t + sqrt(sig_hat ** 2 - sig ** 2) * eps
+            x_hat = x_t + math.sqrt(sig_hat ** 2 - sig ** 2) * eps
 
             # Evaluate dx/dt at scheduled time "hat"
             p_hat = self.follow(x_hat, sig_hat, x_c = x_c if use_x_c else None, ctrl = ctrl, guide = guide, clamp = clamp)
@@ -298,7 +303,11 @@ class ColorModule(BitDiffusion):
                 dxdtp = (x_t - p_hat) / sigp1
 
                 x_t = x_hat + 0.5 * (sigp1 - sig_hat) * (dx_dt + dxdtp)
-            
+
+            # Patch in inpainting context if needed
+            if inpaint:
+                x_t[mask] = context[mask] * inpaint_strength + x_t[mask] * (1 - inpaint_strength)
+
             x_c = p_hat
 
         return x_t.clamp(-1., 1.) if clamp else x_t
