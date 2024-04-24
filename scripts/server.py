@@ -161,7 +161,7 @@ def color_generation(data: list[list[list[list[int | None]]]], y: int, steps: in
 
     for b, y, z, x in product(range(b_len), range(y_len), range(z_len), range(x_len)):
         if data[b][y][z][x] == -1:
-            mask[b, y, z, x] = True
+            mask[b, 0, y, z, x] = True
             context_tensor[b, 0, y, z, x] = 1
         else:
             context_tensor[b, 0, y, z, x] = data[b][y][z][x]
