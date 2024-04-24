@@ -65,17 +65,19 @@ class StructureEmbedder(nn.Module):
         embedding_dim: int,
         sample_size: tuple[int, int, int] = (16, 16, 16),
         projection_ratio: float = 4,
+        num_tokens: int = 1,
     ) -> None:
         super().__init__()
 
         self.input_dim = sample_size[0] * sample_size[1] * sample_size[2]
         self.hidden_dim = int(embedding_dim * projection_ratio)
+        self.num_tokens = num_tokens
 
         self.pre_norm = nn.LayerNorm(self.input_dim)
         self.up_proj = nn.Linear(self.input_dim, self.hidden_dim)
         self.gate_proj = nn.Linear(self.input_dim, self.hidden_dim)
         self.activation = nn.GELU()
-        self.down_proj = nn.Linear(self.hidden_dim, embedding_dim)
+        self.down_proj = nn.Linear(self.hidden_dim, num_tokens * embedding_dim)
         self.post_norm = nn.LayerNorm(embedding_dim)
 
     def forward(
@@ -85,7 +87,8 @@ class StructureEmbedder(nn.Module):
         structure = structure.view(structure.shape[0], -1)
         structure = self.pre_norm(structure)
 
-        return self.post_norm(self.down_proj(self.activation(self.gate_proj(structure)) * self.up_proj(structure)))
+        full_embed = self.down_proj(self.activation(self.gate_proj(structure)) * self.up_proj(structure))
+        return self.post_norm(full_embed.view(structure.shape[0], self.num_tokens, -1))
 
 
 class ControlEmbedder(nn.Module):
@@ -107,7 +110,7 @@ class ControlEmbedder(nn.Module):
         structure, y_indices = control_inputs["structure"], control_inputs["y_index"]
         structure = structure.float() * 2 - 1  # from {0, 1} to {-1, 1}
 
-        return self.pos_embedder(y_indices) + self.structure_embedder(structure)
+        return self.pos_embedder(y_indices).unsqueeze(1) + self.structure_embedder(structure)
 
 
 class ColorModule(BitDiffusion):
@@ -165,7 +168,7 @@ class ColorModule(BitDiffusion):
         # Initialize the network
         net = Unet3D(**net_par)
 
-        ctrl_dim = kwargs.pop("ctrl_dim")
+        ctrl_dim = net_par.pop("ctrl_dim")
 
         return cls(ctrl_dim, model=net, **kwargs)
 
@@ -216,6 +219,43 @@ class ColorModule(BitDiffusion):
 
         # # Log images using the default TensorBoard logger
         # self.logger.experiment.add_image(self.log_img_key, imgs, global_step = self.global_step)
+    
+    @th.no_grad()
+    def forward(
+        self,
+        num_imgs : int = 4,
+        num_steps : Optional[int] = None,
+        ode_solver : Optional[str] = None,
+        norm_undo : Optional[Callable] = None,
+        ctrl : Optional[th.Tensor] = None,
+        use_x_c : Optional[bool] = None,
+        guide : float = 1.,
+        **kwargs,
+    ) -> Generator[th.Tensor, None, None]:
+        '''
+            Sample images using a given sampler (ODE Solver)
+            from the trained model. 
+        '''
+
+        use_x_c = default(use_x_c, self.self_cond)
+        num_steps = default(num_steps, self.sample_steps)
+        norm_undo = default(norm_undo, self.norm_backward)
+        self.ode_solver = default(ode_solver, self.ode_solver)
+
+        timestep = self.get_timesteps(num_steps)
+        schedule = self.get_schedule(timestep)
+        scaling  = self.get_scaling (timestep)
+
+        # schedule = repeat(schedule, '... -> b ...', b = num_imgs)
+        # scaling  = repeat(scaling , '... -> b ...', b = num_imgs)
+
+        # Encode the condition using the sequence encoder
+        ctrl = self.ctrl_emb(ctrl)[:num_imgs] if exists(ctrl) else ctrl
+
+        shape = (num_imgs, self.model.channels, *self.img_size)
+
+        for step_output in self.sampler(shape, schedule, scaling, ctrl=ctrl, use_x_c=use_x_c, guide=guide, **kwargs):
+            yield norm_undo(step_output)
 
     @th.no_grad()
     def heun_sde_inpaint(
@@ -227,6 +267,7 @@ class ColorModule(BitDiffusion):
         context: Optional[th.Tensor] = None,
         mask: Optional[th.BoolTensor] = None,  # mask of area to inpaint
         inpaint_strength: float = 1.,
+        norm_fn: Optional[Callable] = None,
         use_x_c: Optional[bool] = None,
         clamp: bool = False,
         guide: float = 1.,
@@ -235,7 +276,7 @@ class ColorModule(BitDiffusion):
         s_churn: float = 80,
         s_noise: float = 1.003,
         verbose: bool = False
-    ) -> th.Tensor:
+    ) -> Generator[th.Tensor, None, None]:
         """
             based on diffusion.py heun sde implementation
 
@@ -252,6 +293,7 @@ class ColorModule(BitDiffusion):
             assert 0 < inpaint_strength <= 1, "Inpaint strength must be in (0, 1]"
             mask = ~mask  # invert mask so it is a context mask instead
             context = norm_fn(context)  # normalize context
+            mask = mask.expand(*context.shape)
 
         T = schedule.shape[0]
 
@@ -271,10 +313,10 @@ class ColorModule(BitDiffusion):
                 noise = th.randn(shape, device = schedule.device)
                 sigma_delta = (current_sigma ** 2 - last_sigma ** 2) ** 0.5
 
-                latest_image = inpaint_schedule[-1]
+                latest_images = inpaint_schedule[-1]
 
-                noised_image = latest_image + sigma_delta * noise
-                inpaint_schedule.append(noised_image)
+                noised_images = latest_images + sigma_delta * noise
+                inpaint_schedule.append(noised_images)
 
             x_t = inpaint_schedule[-1]
 
@@ -310,7 +352,7 @@ class ColorModule(BitDiffusion):
 
             x_c = p_hat
 
-        return x_t.clamp(-1., 1.) if clamp else x_t
+            yield x_t.clamp(-1., 1.) if clamp else x_t
 
     @property
     def sampler(self) -> Callable:
