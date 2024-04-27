@@ -153,18 +153,16 @@ async def get_structure(request: Request):
     return StreamingResponse(structure_generation(data["data"], data["y"], data["sampling"]))
 
 
-def color_generation(data: list[list[list[list[int | None]]]], y: int, steps: int, strength: float) -> Generator[str, None, None]:
+def color_generation(data: list[list[list[list[int | None]]]], mask: list[list[list[list[bool]]]], y: int, steps: int, strength: float) -> Generator[str, None, None]:
     b_len, y_len, z_len, x_len = len(data), len(data[0]), len(data[0][0]), len(data[0][0][0])
+    
+    assert b_len == len(mask)
+    assert y_len == len(mask[0])
+    assert z_len == len(mask[0][0])
+    assert x_len == len(mask[0][0][0])
 
-    mask = th.zeros((b_len, 1, y_len, z_len, x_len), dtype=th.bool, device=color_model.device)  # (b, c, y, z, x)
-    context_tensor = th.empty_like(mask, dtype=th.uint8, device=color_model.device)
-
-    for b, y, z, x in product(range(b_len), range(y_len), range(z_len), range(x_len)):
-        if data[b][y][z][x] == -1:
-            mask[b, 0, y, z, x] = True
-            context_tensor[b, 0, y, z, x] = 1
-        else:
-            context_tensor[b, 0, y, z, x] = data[b][y][z][x]
+    mask = th.tensor(mask, dtype=th.bool, device=color_model.device).view(b_len, 1, y_len, z_len, x_len)  # (b, c, y, z, x)
+    context_tensor = th.tensor(data, dtype=th.uint8, device=color_model.device).view(b_len, 1, y_len, z_len, x_len)
 
     control = {
         "structure": context_tensor > 0,
@@ -182,7 +180,7 @@ def color_generation(data: list[list[list[list[int | None]]]], y: int, steps: in
 @app.post("/color")
 async def get_color(request: Request):
     data = await request.json()
-    return StreamingResponse(color_generation(data["data"], data["y"], data["steps"], data["strength"]))
+    return StreamingResponse(color_generation(data["data"], data["mask"], data["y"], data["steps"], data["strength"]))
 
 
 if __name__ == '__main__':
