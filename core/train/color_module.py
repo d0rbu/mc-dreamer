@@ -321,7 +321,7 @@ class ColorModule(BitDiffusion):
             x_t = inpaint_schedule[-1]
 
         pars = zip(groupwise(schedule, n = 2), gammas)
-        for (sig, sigp1), gamma in tqdm(pars, total = T, desc = 'Stochastic Heun', disable = not verbose):
+        for (sig, sigp1), gamma in tqdm(pars, total = T, desc = "Stochastic Heun", disable = not verbose):
             # Sample additive noise
             eps = s_noise * th.randn_like(x_t)
 
