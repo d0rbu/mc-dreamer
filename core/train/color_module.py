@@ -64,7 +64,7 @@ class StructureEmbedder(nn.Module):
         self: Self,
         embedding_dim: int,
         sample_size: tuple[int, int, int] = (16, 16, 16),
-        projection_ratio: float = 4,
+        projection_ratio: float = 4.,
         num_tokens: int = 1,
     ) -> None:
         super().__init__()
@@ -96,12 +96,14 @@ class ControlEmbedder(nn.Module):
         self: Self,
         embedding_dim: int,
         sample_size: tuple[int, int, int] = (16, 16, 16),
-        pos_embedding_dim: int | None = None
+        pos_embedding_dim: int | None = None,
+        projection_ratio: float = 4.,
+        num_tokens: int = 1,
     ) -> None:
         super().__init__()
 
         self.pos_embedder = PositionEmbedder(embedding_dim, pos_embedding_dim)
-        self.structure_embedder = StructureEmbedder(embedding_dim, sample_size)
+        self.structure_embedder = StructureEmbedder(embedding_dim, sample_size, projection_ratio, num_tokens)
 
     def forward(
         self: Self,
@@ -110,7 +112,7 @@ class ControlEmbedder(nn.Module):
         structure, y_indices = control_inputs["structure"], control_inputs["y_index"]
         structure = structure.float() * 2 - 1  # from {0, 1} to {-1, 1}
 
-        return self.pos_embedder(y_indices).unsqueeze(1) + self.structure_embedder(structure)
+        return self.pos_embedder(y_indices) + self.structure_embedder(structure)
 
 
 class ColorModule(BitDiffusion):
@@ -170,6 +172,9 @@ class ColorModule(BitDiffusion):
 
         ctrl_dim = net_par.pop("ctrl_dim")
 
+        if "ctrl_dim" in kwargs:
+            del kwargs["ctrl_dim"]
+
         return cls(ctrl_dim, model=net, **kwargs)
 
     def __init__(
@@ -180,6 +185,19 @@ class ColorModule(BitDiffusion):
         super().__init__(**kwargs)
 
         self.ctrl_emb = ControlEmbedder(ctrl_dim)
+
+    # def __init__(
+    #     self: Self,
+    #     ctrl_dim: int,
+    #     sample_size: tuple[int, int, int] = (16, 16, 16),
+    #     pos_embedding_dim: int | None = None,
+    #     projection_ratio: float = 4.,
+    #     num_tokens: int = 4,
+    #     **kwargs,
+    # ) -> None:
+    #     super().__init__(**kwargs)
+
+    #     self.ctrl_emb = ControlEmbedder(ctrl_dim, sample_size, pos_embedding_dim, projection_ratio, num_tokens)
 
     def validation_step(self, batch : dict[str, th.Tensor], batch_idx : int) -> th.Tensor:
         # Extract the starting images from data batch
