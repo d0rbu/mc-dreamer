@@ -327,7 +327,7 @@ class ColorModule(BitDiffusion):
         if inpaint:
             inpaint_schedule = [context]
 
-            for last_sigma, current_sigma in zip(schedule[:-1], schedule[1:]):
+            for last_sigma, current_sigma in reversed(zip(schedule[:-1], schedule[1:])):
                 noise = th.randn(shape, device = schedule.device)
                 sigma_delta = (current_sigma ** 2 - last_sigma ** 2) ** 0.5
 
@@ -430,7 +430,7 @@ class ColorModule(BitDiffusion):
 
         batch_loss_weight = self.loss_weight(sig)  # (B)
         bit_loss_weight = th.repeat_interleave(batch_loss_weight, bits)  # (B * N)
-        structure_block_sizes = structure.sum(dim=[-1, -2, -3]).flatten()  # (B, N)
+        structure_block_sizes = structure.sum(dim=[-1, -2, -3]).flatten()  # (B * N)
 
         block_loss_weight = th.repeat_interleave(bit_loss_weight, structure_block_sizes)  # (D)
 
@@ -463,11 +463,14 @@ class ColorModule(BitDiffusion):
     @classmethod
     def bit2int(cls, bits : th.Tensor, nbits : int = 8) -> th.Tensor:
         """
+            Convert input (float) tensor x (values in [-1, 1])
+            to discrete values in [0, 255].
         """
         device = bits.device
 
-        bits = (bits > 0).int()
-        mask = 2 ** th.arange(nbits - 1, -1, -1, device = device, dtype = int)
+        # bits = (bits > 0).int()
+        bits = bits.round().int()
+        mask = 2 ** th.arange(nbits - 1, -1, -1, device = device, dtype = th.long)
 
         mask = rearrange(mask, "d -> d 1 1 1").contiguous()
         bits = rearrange(bits, "b (c d) y z x -> b c d y z x", d = nbits).contiguous()
