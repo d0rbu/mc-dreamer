@@ -336,10 +336,11 @@ class ColorModule(BitDiffusion):
                 noised_images = latest_images + sigma_delta * noise
                 inpaint_schedule.append(noised_images)
 
-            x_t = inpaint_schedule[-1]
+            inpaint_schedule = inpaint_schedule[::-1]
+            x_t = inpaint_schedule[0]
 
         pars = zip(groupwise(schedule, n = 2), gammas)
-        for (sig, sigp1), gamma in tqdm(pars, total = T, desc = "Stochastic Heun", disable = not verbose):
+        for i, ((sig, sigp1), gamma) in tqdm(enumerate(pars), total = T, desc = "Stochastic Heun", disable = not verbose):
             # Sample additive noise
             eps = s_noise * th.randn_like(x_t)
 
@@ -366,7 +367,7 @@ class ColorModule(BitDiffusion):
 
             # Patch in inpainting context if needed
             if inpaint:
-                x_t[mask] = context[mask] * inpaint_strength + x_t[mask] * (1 - inpaint_strength)
+                x_t[mask] = inpaint_schedule[i][mask] * inpaint_strength + x_t[mask] * (1 - inpaint_strength)
 
             x_c = p_hat
 
