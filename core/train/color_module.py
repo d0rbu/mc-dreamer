@@ -327,7 +327,7 @@ class ColorModule(BitDiffusion):
         if inpaint:
             inpaint_schedule = [context]
 
-            for last_sigma, current_sigma in zip(schedule[:0:-1], schedule[-2::-1]):
+            for last_sigma, current_sigma in reversed(list(zip(schedule[:-1], schedule[1:]))):
                 noise = th.randn(shape, device = schedule.device)
                 sigma_delta = (current_sigma ** 2 - last_sigma ** 2) ** 0.5
 
