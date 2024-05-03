@@ -2,6 +2,7 @@ import math
 import yaml
 import torch as th
 import torch.nn as nn
+from functools import partial
 from tqdm import tqdm
 from einops import rearrange, reduce
 from modular_diffusion.diffusion.discrete import BitDiffusion
@@ -180,11 +181,14 @@ class ColorModule(BitDiffusion):
     def __init__(
         self: Self,
         ctrl_dim: int,
+        num_bits: float = 1.,
+        bit_scale: float = 1.,
         **kwargs,
     ) -> None:
-        super().__init__(**kwargs)
+        super().__init__(num_bits=num_bits, bit_scale=bit_scale, **kwargs)
 
         self.ctrl_emb = ControlEmbedder(ctrl_dim)
+        self.norm_backward = partial(self.bit2int, nbits=num_bits, scale=bit_scale)
 
     # def __init__(
     #     self: Self,
@@ -367,7 +371,9 @@ class ColorModule(BitDiffusion):
 
             # Patch in inpainting context if needed
             if inpaint:
-                x_t[mask] = inpaint_schedule[i][mask] * inpaint_strength + x_t[mask] * (1 - inpaint_strength)
+                import pdb; pdb.set_trace()
+                x_t[mask] = inpaint_schedule[i+1][mask] * inpaint_strength + x_t[mask] * (1 - inpaint_strength)
+                x_t[~mask] = x_t[~mask] * inpaint_strength + inpaint_schedule[i+1][~mask] * (1 - inpaint_strength)
 
             x_c = p_hat
 
@@ -440,7 +446,7 @@ class ColorModule(BitDiffusion):
         return loss.mean()
 
     @classmethod
-    def int2bit(cls, decs : th.Tensor, nbits : int = 8, scale : float = 1.) -> th.Tensor:
+    def int2bit(cls, decs: th.Tensor, nbits: int = 8, scale: float = 1.) -> th.Tensor:
         """
             Convert input (int) tensor x (values in [0, 255])
             to analog bits in [-1, 1].
@@ -462,7 +468,7 @@ class ColorModule(BitDiffusion):
         return (bits * 2 - 1) * scale
 
     @classmethod
-    def bit2int(cls, bits : th.Tensor, nbits : int = 8) -> th.Tensor:
+    def bit2int(cls, bits: th.Tensor, nbits: int = 8, scale: float = 1.) -> th.Tensor:
         """
             Convert input (float) tensor x (values in [-1, 1])
             to discrete values in [0, 255].
@@ -470,7 +476,9 @@ class ColorModule(BitDiffusion):
         device = bits.device
 
         # bits = (bits > 0).int()
-        bits = bits.round().int()
+        bits = bits / scale
+        bits = bits.clamp(min=-scale, max=scale) / (scale * 2) + 0.5
+        bits = bits.round().long()
         mask = 2 ** th.arange(nbits - 1, -1, -1, device = device, dtype = th.long)
 
         mask = rearrange(mask, "d -> d 1 1 1").contiguous()
