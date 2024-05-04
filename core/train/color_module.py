@@ -171,37 +171,23 @@ class ColorModule(BitDiffusion):
         # Initialize the network
         net = Unet3D(**net_par)
 
-        ctrl_dim = net_par.pop("ctrl_dim")
-
-        if "ctrl_dim" in kwargs:
-            del kwargs["ctrl_dim"]
-
-        return cls(ctrl_dim, model=net, **kwargs)
+        return cls(model=net, **kwargs)
 
     def __init__(
         self: Self,
         ctrl_dim: int,
-        num_bits: float = 1.,
+        num_bits: int = 1.,
         bit_scale: float = 1.,
+        sample_size: tuple[int, int, int] = (16, 16, 16),
+        pos_embedding_dim: int | None = None,
+        projection_ratio: float = 4.,
+        num_ctrl_tokens: int = 4,
         **kwargs,
     ) -> None:
         super().__init__(num_bits=num_bits, bit_scale=bit_scale, **kwargs)
 
-        self.ctrl_emb = ControlEmbedder(ctrl_dim)
+        self.ctrl_emb = ControlEmbedder(ctrl_dim, sample_size, pos_embedding_dim, projection_ratio, num_ctrl_tokens)
         self.norm_backward = partial(self.bit2int, nbits=num_bits, scale=bit_scale)
-
-    # def __init__(
-    #     self: Self,
-    #     ctrl_dim: int,
-    #     sample_size: tuple[int, int, int] = (16, 16, 16),
-    #     pos_embedding_dim: int | None = None,
-    #     projection_ratio: float = 4.,
-    #     num_tokens: int = 4,
-    #     **kwargs,
-    # ) -> None:
-    #     super().__init__(**kwargs)
-
-    #     self.ctrl_emb = ControlEmbedder(ctrl_dim, sample_size, pos_embedding_dim, projection_ratio, num_tokens)
 
     def validation_step(self, batch : dict[str, th.Tensor], batch_idx : int) -> th.Tensor:
         # Extract the starting images from data batch
@@ -289,6 +275,7 @@ class ColorModule(BitDiffusion):
         context: Optional[th.Tensor] = None,
         mask: Optional[th.BoolTensor] = None,  # mask of area to inpaint
         inpaint_strength: float = 1.,
+        structure: Optional[th.LongTensor] = None,
         norm_fn: Optional[Callable] = None,
         use_x_c: Optional[bool] = None,
         clamp: bool = False,
@@ -314,8 +301,11 @@ class ColorModule(BitDiffusion):
         if inpaint:
             assert 0 < inpaint_strength <= 1, "Inpaint strength must be in (0, 1]"
             mask = ~mask  # invert mask so it is a context mask instead
+            structure = context > 0
             context = norm_fn(context)  # normalize context
-            mask = mask.expand(*context.shape)
+            structure = structure.expand_as(context)
+            mask = mask.expand_as(context)
+            mask = mask & structure
 
         T = schedule.shape[0]
 
@@ -345,6 +335,11 @@ class ColorModule(BitDiffusion):
 
         pars = zip(groupwise(schedule, n = 2), gammas)
         for i, ((sig, sigp1), gamma) in tqdm(enumerate(pars), total = T, desc = "Stochastic Heun", disable = not verbose):
+            # Patch in inpainting context if needed
+            if inpaint:
+                x_t[mask] = inpaint_schedule[i][mask] * inpaint_strength + x_t[mask] * (1 - inpaint_strength)
+                x_t[~mask] = x_t[~mask] * inpaint_strength + inpaint_schedule[i][~mask] * (1 - inpaint_strength)
+
             # Sample additive noise
             eps = s_noise * th.randn_like(x_t)
 
@@ -368,12 +363,6 @@ class ColorModule(BitDiffusion):
                 dxdtp = (x_t - p_hat) / sigp1
 
                 x_t = x_hat + 0.5 * (sigp1 - sig_hat) * (dx_dt + dxdtp)
-
-            # Patch in inpainting context if needed
-            if inpaint:
-                import pdb; pdb.set_trace()
-                x_t[mask] = inpaint_schedule[i+1][mask] * inpaint_strength + x_t[mask] * (1 - inpaint_strength)
-                x_t[~mask] = x_t[~mask] * inpaint_strength + inpaint_schedule[i+1][~mask] * (1 - inpaint_strength)
 
             x_c = p_hat
 

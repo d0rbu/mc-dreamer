@@ -1,11 +1,14 @@
 MODEL:
   net_dim: 64
   channels: 8
-  attn_dim: 512
+  attn_dim: 1024
   num_group: 1
   chn_mult: [1, 2, 4, 8, 16]
+  projection_ratio: 4.
   num_heads: 8
-  ctrl_dim: 512
+  ctrl_dim: 1024
+  num_ctrl_tokens: 16
+  # num_ctrl_tokens: 8
 DIFFUSION:
   img_size: [16, 16, 16]
   num_bits: 8
@@ -21,6 +24,7 @@ DATASET:
   batch_size: 128
 TRAINING:
   mode: color
+  # accumulate_grad_batches: 16
   accumulate_grad_batches: 8
   precision: 16
   gradient_clip_val: 1.0

@@ -2,9 +2,10 @@ import json
 import os
 import argparse
 import uvicorn
+import yaml
 import torch as th
 import torch.nn.functional as F
-from itertools import product
+from itertools import product, chain
 from functools import partial
 from pyngrok import ngrok
 from fastapi import Request, FastAPI
@@ -40,8 +41,23 @@ if not args.only_color:
     del ckpt
 
 if not args.only_structure:
+    with open(args.config_color, "r") as file:
+        conf = yaml.safe_load(file)
+
+        # First flatten conf
+        defaults = {
+            key: value for key, value in chain(*[category.items() for category in conf.values() if isinstance(category, dict)])
+        }
+
+        # Then update any args that are None with the defaults
+        for key, value in defaults.items():
+            if getattr(args, key, None) is None:
+                setattr(args, key, value)
+
+    model_kwargs = vars(args)
+
     print("Loading color model...")
-    color_model = ColorModule.from_conf(args.config_color)
+    color_model = ColorModule.from_conf(model_kwargs.pop("config_color"), **model_kwargs)
     ckpt = th.load(args.ckpt_color)
     color_model.load_state_dict(ckpt["state_dict"])
     color_model.cuda()
