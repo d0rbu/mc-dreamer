@@ -336,7 +336,7 @@ class ColorModule(BitDiffusion):
         pars = zip(groupwise(schedule, n = 2), gammas)
         for i, ((sig, sigp1), gamma) in tqdm(enumerate(pars), total = T, desc = "Stochastic Heun", disable = not verbose):
             # Patch in inpainting context if needed
-            if inpaint:
+            if inpaint and i > 0:
                 x_t[mask] = inpaint_schedule[i][mask] * inpaint_strength + x_t[mask] * (1 - inpaint_strength)
                 x_t[~mask] = x_t[~mask] * inpaint_strength + inpaint_schedule[i][~mask] * (1 - inpaint_strength)
 

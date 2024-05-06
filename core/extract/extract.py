@@ -102,7 +102,7 @@ def extract_from_ndarray(
         plane_block_counts[0, 0] = \
             running_integral[-1, sample_size[1] - 1, sample_size[2] - 1] - \
             running_integral[0, sample_size[1] - 1, sample_size[2] - 1]
-        
+
         assert (plane_block_counts.sum(axis=-1) == sample_size[0] * sample_size[1] * sample_size[2]).all()
 
         scores[x - sample_size[0] + 1] = OptimizedHeuristics.best_heuristic(plane_block_counts, sample_size)
