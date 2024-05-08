@@ -76,7 +76,13 @@ class StructureEmbedder(nn.Module):
 
         self.pre_norm = nn.LayerNorm(self.input_dim)
         self.up_proj = nn.Linear(self.input_dim, self.hidden_dim)
-        self.gate_proj = nn.Linear(self.input_dim, self.hidden_dim)
+        self.up_gate_proj = nn.Linear(self.input_dim, self.hidden_dim)
+        self.mid_proj_0 = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.mid_norm_0 = nn.LayerNorm(self.hidden_dim)
+        self.mid_gate_proj_0 = nn.Linear(self.input_dim, self.hidden_dim)
+        self.mid_proj_1 = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.mid_norm_1 = nn.LayerNorm(self.hidden_dim)
+        self.mid_gate_proj_1 = nn.Linear(self.input_dim, self.hidden_dim)
         self.activation = nn.GELU()
         self.down_proj = nn.Linear(self.hidden_dim, num_tokens * embedding_dim)
         self.post_norm = nn.LayerNorm(embedding_dim)
@@ -88,8 +94,12 @@ class StructureEmbedder(nn.Module):
         structure = structure.view(structure.shape[0], -1)
         structure = self.pre_norm(structure)
 
-        full_embed = self.down_proj(self.activation(self.gate_proj(structure)) * self.up_proj(structure))
-        return self.post_norm(full_embed.view(structure.shape[0], self.num_tokens, -1))
+        hidden = self.activation(self.up_gate_proj(structure)) * self.up_proj(structure)
+        hidden = self.mid_norm_0(self.activation(self.mid_gate_proj_0(structure)) * self.mid_proj_0(hidden))
+        hidden = self.mid_norm_1(self.activation(self.mid_gate_proj_1(structure)) * self.mid_proj_1(hidden))
+        hidden = self.down_proj(hidden)
+
+        return self.post_norm(hidden.view(structure.shape[0], self.num_tokens, -1))
 
 
 class ControlEmbedder(nn.Module):
