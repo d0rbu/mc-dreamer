@@ -309,7 +309,7 @@ class ColorModule(BitDiffusion):
         norm_fn = default(norm_fn, self.norm_forward)
 
         if inpaint:
-            assert 0 < inpaint_strength <= 1, "Inpaint strength must be in (0, 1]"
+            assert 0 <= inpaint_strength <= 1, "Inpaint strength must be in [0, 1]"
             mask = ~mask  # invert mask so it is a context mask instead
             structure = context > 0
             context = norm_fn(context)  # normalize context
@@ -347,7 +347,7 @@ class ColorModule(BitDiffusion):
         for i, ((sig, sigp1), gamma) in tqdm(enumerate(pars), total = T, desc = "Stochastic Heun", disable = not verbose):
             # Patch in inpainting context if needed
             if inpaint and i > 0:
-                x_t[mask] = inpaint_schedule[i][mask] * inpaint_strength + x_t[mask] * (1 - inpaint_strength)
+                x_t[mask] = inpaint_schedule[i][mask]
                 x_t[~mask] = x_t[~mask] * inpaint_strength + inpaint_schedule[i][~mask] * (1 - inpaint_strength)
 
             # Sample additive noise
