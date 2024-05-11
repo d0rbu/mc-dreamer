@@ -11,6 +11,7 @@ from random import random
 from core.model.unet import Unet3D
 from typing import Callable, Optional, Self, Any, Generator
 from core.scheduler import SequentialLR, ChainedScheduler, step_scheduler
+from ema_pytorch import EMA
 
 from modular_diffusion.diffusion.module.utils.misc import exists, default, enlarge_as, groupwise
 
@@ -185,6 +186,7 @@ class ColorModule(BitDiffusion):
 
     def __init__(
         self: Self,
+        model: nn.Module,
         ctrl_dim: int,
         num_bits: int = 1.,
         bit_scale: float = 1.,
@@ -192,21 +194,43 @@ class ColorModule(BitDiffusion):
         pos_embedding_dim: int | None = None,
         projection_ratio: float = 4.,
         num_ctrl_tokens: int = 4,
+        ema_beta: float = 0.9999,
+        ema_update_after_step: int = 2000,  # lag time for the ema to not include the initial garbage initializations
+        ema_update_every: int = 100,  # how often to actually update ema model
         **kwargs,
     ) -> None:
-        super().__init__(num_bits=num_bits, bit_scale=bit_scale, **kwargs)
+        super().__init__(model=model, num_bits=num_bits, bit_scale=bit_scale, **kwargs)
 
         self.ctrl_emb = ControlEmbedder(ctrl_dim, sample_size, pos_embedding_dim, projection_ratio, num_ctrl_tokens)
         self.norm_backward = partial(self.bit2int, nbits=num_bits, scale=bit_scale)
+        self.ema = EMA(
+            model,
+            beta=ema_beta,
+            update_after_step=ema_update_after_step,
+            update_every=ema_update_every,
+        )
+
+    # * Lightning Module functions
+    def training_step(self, batch : Dict[str, Tensor], batch_idx : int) -> Tensor:
+        # Extract the starting images from data batch
+        x_0  = batch[self.data_key]
+        ctrl = batch[self.ctrl_key] if exists(self.ctrl_key) else None
+
+        loss = self.compute_loss(x_0, ctrl = ctrl)
+        self.ema.update()
+
+        self.log_dict({'train_loss' : loss}, logger = True, on_step = True, sync_dist = True)
+
+        return loss
 
     def validation_step(self, batch : dict[str, th.Tensor], batch_idx : int) -> th.Tensor:
         # Extract the starting images from data batch
         x_0  = batch[self.data_key]
         ctrl = batch[self.ctrl_key] if exists(self.ctrl_key) else None
 
-        loss = self.compute_loss(x_0, ctrl = ctrl)
+        loss = self.compute_loss(x_0, ctrl=ctrl, use_ema=True)
 
-        self.log_dict({"val_loss" : loss}, logger = True, on_step = True, sync_dist = True)
+        self.log_dict({"val_loss" : loss}, logger=True, on_step=True, sync_dist=True)
 
         self.val_outs = ((x_0, ctrl),)
 
@@ -218,11 +242,12 @@ class ColorModule(BitDiffusion):
             At the end of the validation cycle, we inspect how the denoising
             procedure is doing by sampling novel images from the learn distribution.
         """
-        
-        val_outs: tuple[th.Tensor, ...] = self.val_outs
+        pass
 
-        # Collect the input shapes
-        (x_0, ctrl), *_ = val_outs
+        # val_outs: tuple[th.Tensor, ...] = self.val_outs
+
+        # # Collect the input shapes
+        # (x_0, ctrl), *_ = val_outs
 
         # # Produce 8 samples and log them
         # imgs = self(
@@ -285,6 +310,7 @@ class ColorModule(BitDiffusion):
         context: Optional[th.Tensor] = None,
         mask: Optional[th.BoolTensor] = None,  # mask of area to inpaint
         inpaint_strength: float = 1.,
+        use_ema: bool = False,
         structure: Optional[th.LongTensor] = None,
         norm_fn: Optional[Callable] = None,
         use_x_c: Optional[bool] = None,
@@ -360,7 +386,7 @@ class ColorModule(BitDiffusion):
             x_hat = x_t + math.sqrt(sig_hat ** 2 - sig ** 2) * eps
 
             # Evaluate dx/dt at scheduled time "hat"
-            p_hat = self.follow(x_hat, sig_hat, x_c = x_c if use_x_c else None, ctrl = ctrl, guide = guide, clamp = clamp)
+            p_hat = self.follow(x_hat, sig_hat, x_c = x_c if use_x_c else None, ctrl = ctrl, guide = guide, clamp = clamp, use_ema = use_ema)
             dx_dt = (x_hat - p_hat) / sig_hat
 
             # Take Euler step from schedule time "hat" to time + 1
@@ -369,7 +395,7 @@ class ColorModule(BitDiffusion):
             # Add second order correction only if schedule not finished yet
             if sigp1 != 0:
                 # Now the conditioning can be last prediction
-                p_hat = self.follow(x_t, sigp1, x_c = x_c if use_x_c else None, ctrl = ctrl, guide = guide, clamp = clamp)
+                p_hat = self.follow(x_t, sigp1, x_c = x_c if use_x_c else None, ctrl = ctrl, guide = guide, clamp = clamp, use_ema = use_ema)
                 dxdtp = (x_t - p_hat) / sigp1
 
                 x_t = x_hat + 0.5 * (sigp1 - sig_hat) * (dx_dt + dxdtp)
@@ -396,6 +422,7 @@ class ColorModule(BitDiffusion):
         ctrl : Optional[th.Tensor] = None,
         use_x_c : Optional[bool] = None,     
         norm_fn : Optional[Callable] = None,
+        use_ema : bool = False,
     ) -> th.Tensor:
         use_x_c = default(use_x_c, self.self_cond)
         norm_fn = default(norm_fn, self.norm_forward)
@@ -425,10 +452,10 @@ class ColorModule(BitDiffusion):
         # Use self-conditioning with 50% dropout
         if use_x_c and random() < 0.5:
             with th.no_grad():
-                x_c = self.predict(x_t, sig, ctrl = ctrl)
+                x_c = self.predict(x_t, sig, ctrl = ctrl, use_ema = use_ema)
                 x_c.detach_()
 
-        x_p = self.predict(x_t, sig, x_c = x_c, ctrl = ctrl)
+        x_p = self.predict(x_t, sig, x_c = x_c, ctrl = ctrl, use_ema = use_ema)
         structure = structure.expand(bs, bits, *structure.shape[2:])  # (B, N, Y, Z, X)
 
         # Compute the distribution loss ONLY for blocks that are solid in the structures
@@ -443,6 +470,44 @@ class ColorModule(BitDiffusion):
         # Add loss weight (fixed to be by block instead of by batch)
         loss *= block_loss_weight
         return loss.mean()
+
+    def predict(
+        self,
+        x_t : Tensor,
+        sig : Tensor,
+        x_c  : Optional[Tensor] = None,
+        ctrl : Optional[Tensor] = None,
+        clamp : bool = False,
+        use_ema : bool = False,
+    ) -> Tensor:
+        '''
+            Apply the backbone model to come up with a prediction, the
+            nature of which depends on the diffusion objective (can either
+            be noise|x_start|v prediction).
+        '''
+
+        bs, *_, device = x_t.shape, x_t.device
+
+        if isinstance(sig, float): sig = torch.full((bs,), sig, device = device)
+
+        # Inject appropriate noise value to images
+        p_sig = enlarge_as(sig, x_t)
+        x_sig = self.c_in(p_sig) * x_t
+        t_sig = self.c_noise(sig)
+
+        # Use the model to come up with a (hybrid) prediction the nature of
+        # which depends on the implementation of the various c_<...> terms
+        # so that the network can either predict the noise (eps) or the
+        # input directly (better when noise is large!)
+        if use_ema:
+            out : Tensor = self.model(x_sig, t_sig, x_c = x_c, ctrl = ctrl)
+        else:
+            out : Tensor = self.ema(x_sig, t_sig, x_c = x_c, ctrl = ctrl)
+        out : Tensor = self.c_skip(p_sig) * x_t + self.c_out(p_sig) * out
+
+        if clamp: out = out.clamp(-1., 1.)
+
+        return out
 
     @classmethod
     def int2bit(cls, decs: th.Tensor, nbits: int = 8, scale: float = 1.) -> th.Tensor:
