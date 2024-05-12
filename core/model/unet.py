@@ -26,6 +26,7 @@ class Unet3D(UNet):
         num_heads : int = 4,
         qry_chunk : int = 512,
         key_chunk : int = 1024,
+        **kwargs,
     ) -> None:
         super(UNet, self).__init__()
 
