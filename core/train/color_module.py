@@ -211,7 +211,7 @@ class ColorModule(BitDiffusion):
         )
 
     # * Lightning Module functions
-    def training_step(self, batch : Dict[str, Tensor], batch_idx : int) -> Tensor:
+    def training_step(self, batch : dict[str, th.Tensor], batch_idx : int) -> th.Tensor:
         # Extract the starting images from data batch
         x_0  = batch[self.data_key]
         ctrl = batch[self.ctrl_key] if exists(self.ctrl_key) else None
@@ -473,13 +473,13 @@ class ColorModule(BitDiffusion):
 
     def predict(
         self,
-        x_t : Tensor,
-        sig : Tensor,
-        x_c  : Optional[Tensor] = None,
-        ctrl : Optional[Tensor] = None,
+        x_t : th.Tensor,
+        sig : th.Tensor,
+        x_c  : Optional[th.Tensor] = None,
+        ctrl : Optional[th.Tensor] = None,
         clamp : bool = False,
         use_ema : bool = False,
-    ) -> Tensor:
+    ) -> th.Tensor:
         '''
             Apply the backbone model to come up with a prediction, the
             nature of which depends on the diffusion objective (can either
@@ -499,10 +499,8 @@ class ColorModule(BitDiffusion):
         # which depends on the implementation of the various c_<...> terms
         # so that the network can either predict the noise (eps) or the
         # input directly (better when noise is large!)
-        if use_ema:
-            out : Tensor = self.model(x_sig, t_sig, x_c = x_c, ctrl = ctrl)
-        else:
-            out : Tensor = self.ema(x_sig, t_sig, x_c = x_c, ctrl = ctrl)
+        model = self.ema if use_ema else self.model
+        out : Tensor = model(x_sig, t_sig, x_c = x_c, ctrl = ctrl)
         out : Tensor = self.c_skip(p_sig) * x_t + self.c_out(p_sig) * out
 
         if clamp: out = out.clamp(-1., 1.)
