@@ -185,7 +185,7 @@ def color_generation(data: list[list[list[list[int | None]]]], mask: list[list[l
         "y_index": y,
     }
 
-    for step in tqdm(color_model(1, steps, "heun_sde_inpaint", ctrl=control, context=context_tensor, mask=mask, inpaint_strength=strength, clamp=True), total=steps, desc="Color generation", leave=False):
+    for step in tqdm(color_model(1, steps, "heun_sde_inpaint", ctrl=control, context=context_tensor, mask=mask, inpaint_strength=strength, clamp=True, use_ema=True), total=steps, desc="Color generation", leave=False):
         generated_region = step[mask].tolist()
         generated_coords = th.nonzero(mask).tolist()
 
