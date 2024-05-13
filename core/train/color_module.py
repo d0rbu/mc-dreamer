@@ -208,20 +208,15 @@ class ColorModule(BitDiffusion):
             beta=ema_beta,
             update_after_step=ema_update_after_step,
             update_every=ema_update_every,
+            include_online_model=False,
         )
-
-    # * Lightning Module functions
-    def training_step(self, batch : dict[str, th.Tensor], batch_idx : int) -> th.Tensor:
-        # Extract the starting images from data batch
-        x_0  = batch[self.data_key]
-        ctrl = batch[self.ctrl_key] if exists(self.ctrl_key) else None
-
-        loss = self.compute_loss(x_0, ctrl = ctrl)
-        self.ema.update()
-
-        self.log_dict({'train_loss' : loss}, logger = True, on_step = True, sync_dist = True)
-
-        return loss
+        self.ctrl_emb_ema = EMA(
+            self.ctrl_emb,
+            beta=ema_beta,
+            update_after_step=ema_update_after_step,
+            update_every=ema_update_every,
+            include_online_model=False,
+        )
 
     def validation_step(self, batch : dict[str, th.Tensor], batch_idx : int) -> th.Tensor:
         # Extract the starting images from data batch
@@ -273,6 +268,7 @@ class ColorModule(BitDiffusion):
         ctrl : Optional[th.Tensor] = None,
         use_x_c : Optional[bool] = None,
         guide : float = 1.,
+        use_ema : bool = False,
         **kwargs,
     ) -> Generator[th.Tensor, None, None]:
         '''
@@ -293,7 +289,7 @@ class ColorModule(BitDiffusion):
         # scaling  = repeat(scaling , '... -> b ...', b = num_imgs)
 
         # Encode the condition using the sequence encoder
-        ctrl = self.ctrl_emb(ctrl)[:num_imgs] if exists(ctrl) else ctrl
+        ctrl = (self.ctrl_emb_ema(ctrl) if use_ema else self.ctrl_emb(ctrl))[:num_imgs] if exists(ctrl) else ctrl
 
         shape = (num_imgs, self.model.channels, *self.img_size)
 
@@ -431,7 +427,7 @@ class ColorModule(BitDiffusion):
         structure = ctrl["structure"].unsqueeze(1)  # Add channel dimension
 
         # Encode the condition using the sequence encoder
-        ctrl = self.ctrl_emb(ctrl) if exists(ctrl) else ctrl
+        ctrl = ((self.ctrl_emb_ema(ctrl) if use_ema else self.ctrl_emb(ctrl)) if exists(ctrl) else ctrl)
 
         # Normalize input volumes
         x_0 = norm_fn(x_0)

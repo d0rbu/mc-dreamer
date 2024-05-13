@@ -1,12 +1,27 @@
 import argparse
 import yaml
-from lightning import Trainer
-from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor
+from lightning import Trainer, LightningModule
+from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor, Callback
 from lightning.pytorch.loggers import WandbLogger
 from core.data.samples_module import WorldSampleDataModule
 from core.train.structure_module import StructureModule
 from core.train.color_module import ColorModule
 from itertools import chain
+
+
+class EMACallback(Callback):
+    def on_after_backward(
+        trainer: Trainer,
+        module: LightningModule,
+    ) -> None:
+        ema_model = getattr(model, "ema", None)
+        ema_ctrl_model = getattr(model, "ctrl_emb_ema", None)
+
+        if ema_model is not None:
+            ema_model.update()
+
+        if ema_ctrl_model is not None:
+            ema_ctrl_model.update()
 
 
 def train(args: argparse.Namespace) -> None:
@@ -44,11 +59,12 @@ def train(args: argparse.Namespace) -> None:
     best_ckpt_callback = ModelCheckpoint(dirpath=args.ckpt_dir, monitor="val_loss_epoch", save_top_k=1, mode="min")
     last_ckpt_callback = ModelCheckpoint(dirpath=args.ckpt_dir, monitor="step", every_n_train_steps=args.val_check_interval, save_top_k=1, mode="max", save_last="link")
     lr_callback = LearningRateMonitor(logging_interval="step")
+    ema_callback = EMACallback()
     logger = WandbLogger(log_model=False, project="mc-dreamer", name=f"{args.mode}_training")
 
     trainer = Trainer(
         logger = logger,
-        callbacks = [best_ckpt_callback, last_ckpt_callback, lr_callback],
+        callbacks = [best_ckpt_callback, last_ckpt_callback, lr_callback, ema_callback],
         max_epochs = -1,
         max_steps = args.steps,
         accumulate_grad_batches = args.accumulate_grad_batches,
