@@ -168,4 +168,4 @@ java/.idea
 test_inputs/
 schematics_outputs/*
 wandb/*
-checkpoints*
+*.ckpt
