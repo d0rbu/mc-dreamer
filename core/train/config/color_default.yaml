@@ -1,5 +1,5 @@
 MODEL:
-  net_dim: 256
+  net_dim: 128
   channels: 8
   attn_dim: 512
   num_group: 1
@@ -24,10 +24,10 @@ OPTIMIZER:
   min_lr: 0.00001
   plateau_patience: 10
 DATASET:
-  batch_size: 128
+  batch_size: 64
 TRAINING:
   mode: color
-  accumulate_grad_batches: 4
+  accumulate_grad_batches: 8
   precision: 16
   gradient_clip_val: 1.0
   accelerator: gpu
