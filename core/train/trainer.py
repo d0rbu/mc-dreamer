@@ -7,15 +7,17 @@ from core.data.samples_module import WorldSampleDataModule
 from core.train.structure_module import StructureModule
 from core.train.color_module import ColorModule
 from itertools import chain
+from typing import Self
 
 
 class EMACallback(Callback):
     def on_after_backward(
+        self: Self,
         trainer: Trainer,
         module: LightningModule,
     ) -> None:
-        ema_model = getattr(model, "ema", None)
-        ema_ctrl_model = getattr(model, "ctrl_emb_ema", None)
+        ema_model = getattr(module, "ema", None)
+        ema_ctrl_model = getattr(module, "ctrl_emb_ema", None)
 
         if ema_model is not None:
             ema_model.update()
