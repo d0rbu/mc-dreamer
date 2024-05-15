@@ -1,23 +1,23 @@
 MODEL:
-  net_dim: 128
+  net_dim: 144
   channels: 8
-  attn_dim: 512
+  attn_dim: 320
   num_group: 1
   chn_mult: [1, 2, 4, 8]
   projection_ratio: 4.
   num_heads: 8
-  ctrl_dim: 512
+  ctrl_dim: 320
   num_ctrl_tokens: 8
-  ema_beta: 0.9999
+  ema_beta: 0.99
   ema_update_after_step: 2000
   ema_update_every: 100
 DIFFUSION:
   img_size: [16, 16, 16]
   num_bits: 8
-  sample_steps: 256
+  sample_steps: 512
 OPTIMIZER:
-  lr: 0.0001
-  wd: 0.01
+  lr: 0.0002
+  wd: 0.001
   warmup_steps: 1000
   restart_interval: 1000
   lr_decay: 0.8
@@ -27,7 +27,7 @@ DATASET:
   batch_size: 64
 TRAINING:
   mode: color
-  accumulate_grad_batches: 8
+  accumulate_grad_batches: 4
   precision: 16
   gradient_clip_val: 1.0
   accelerator: gpu
