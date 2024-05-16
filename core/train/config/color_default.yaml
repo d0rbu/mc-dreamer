@@ -1,22 +1,22 @@
 MODEL:
   net_dim: 144
   channels: 8
-  attn_dim: 320
+  attn_dim: 256
   num_group: 1
   chn_mult: [1, 2, 4, 8]
   projection_ratio: 4.
   num_heads: 8
-  ctrl_dim: 320
+  ctrl_dim: 256
   num_ctrl_tokens: 8
-  ema_beta: 0.99
-  ema_update_after_step: 2000
+  ema_beta: 0.996
+  ema_update_after_step: 8000
   ema_update_every: 100
 DIFFUSION:
   img_size: [16, 16, 16]
   num_bits: 8
   sample_steps: 512
 OPTIMIZER:
-  lr: 0.0002
+  lr: 0.00016
   wd: 0.001
   warmup_steps: 1000
   restart_interval: 1000
