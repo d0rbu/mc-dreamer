@@ -3,7 +3,7 @@ from manim import *
 from itertools import product
 
 
-VOLUME_SIZE = 16
+VOLUME_SIZE = 8
 TUBE_LENGTH = 8
 FILL_OPACITY = 0.4
 CAMERA_ROTATION_RATE = 3 * DEGREES  # n degrees per second
@@ -40,7 +40,7 @@ class main(ThreeDScene):
 
         # 3d rotation over big cube reprenting the volume
         self.begin_ambient_camera_rotation(rate=CAMERA_ROTATION_RATE)
-        self.set_camera_orientation(phi=75 * DEGREES, theta=180 * DEGREES, focal_distance=VOLUME_SIZE * 3)
+        self.set_camera_orientation(phi=75 * DEGREES, theta=180 * DEGREES, focal_distance=(VOLUME_SIZE ** 2) * 0.8)
 
         self.play(Write(big_cube), Write(side_axes), run_time=2)
 
@@ -142,11 +142,18 @@ class main(ThreeDScene):
 
         self.wait(3)  # 29 seconds
 
-        # set up voxels to show flattening
-        for i in range(len(cubes)):
-            cubes_group.target[i].move_to(ORIGIN + RIGHT * i)
-
+        # raise voxels in preparation for flattening
         self.play(
-            MoveToTarget(cubes_group),
-            run_time=4,
+            cubes_group.animate.shift(UP * VOLUME_SIZE/2),
+            run_time=1,
         )
+
+        # move voxels to show flattening
+        self.play(LaggedStart(
+            *[
+                cube.animate.move_to(ORIGIN + RIGHT * (i - VOLUME_SIZE/2 + 0.5))
+                for cube in cubes
+            ],
+            lag_ratio=1/(VOLUME_SIZE**3),
+            run_time=8,
+        ))
