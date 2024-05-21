@@ -12,7 +12,7 @@ CAMERA_ROTATION_RATE = 3 * DEGREES  # n degrees per second
 
 TUBE_TOKENS = np.arange(TUBE_LENGTH ** 2).reshape(TUBE_LENGTH ** 2, 1).repeat(TUBE_LENGTH, axis=1)
 for i in range(TUBE_LENGTH):
-    TUBE_TOKENS[i] %= 2 ** (i + 1)
+    TUBE_TOKENS[:, (-1-i)] = TUBE_TOKENS[:, (-1-i)] // (2 ** i) % 2
 
 TUBE_TO_TOKENS = {
     tuple(tube.tolist()): token
@@ -93,6 +93,7 @@ class SolidTokenization(ThreeDScene):
         chosen_cube.target.set_fill(opacity=FILL_OPACITY)
         chosen_cube.target.set_stroke(opacity=1.0)
         big_cube.target.set_stroke(opacity=0.0)
+        big_cube.target.set_fill(opacity=0.0)
 
         # set up camera movement
         phi, theta, focal_distance, gamma, zoom = self.camera.get_value_trackers()
@@ -110,7 +111,7 @@ class SolidTokenization(ThreeDScene):
             zoom.animate.set_value(5/VOLUME_SIZE),
             non_chosen_cubes.animate.set_stroke(opacity=VOXELS_STROKE_OPACITY/VOLUME_SIZE/4),
             MoveToTarget(chosen_cube),
-            big_cube.animate.set_fill(opacity=0.0),
+            MoveToTarget(big_cube),
             run_time=1,
         )
 
@@ -132,8 +133,8 @@ class SolidTokenization(ThreeDScene):
 
         # set up cubes to return to original view
         cubes_group = VGroup(*cubes)
-        big_cube.set_stroke(opacity=1.0)
-        big_cube.set_fill(opacity=FILL_OPACITY)
+        big_cube.target.set_stroke(opacity=1.0)
+        big_cube.target.set_fill(opacity=FILL_OPACITY)
 
         # return camera to original view
         self.play(
@@ -153,12 +154,15 @@ class SolidTokenization(ThreeDScene):
         example_schematic = np.load("example_schematic.npy")
 
         # set up display of example schematic
+        voxel_values = []
         for z, y, x in product(range(VOLUME_SIZE), repeat=3):
             idx = XYZ_TO_IDX[(x, y, z)]
             if example_schematic[x, z, y] == 1:
                 cubes_group.target[idx].set_fill(opacity=1.0)
+                voxel_values.append(1)
             else:
                 cubes_group.target[idx].set_fill(opacity=0.0)
+                voxel_values.append(0)
             cubes_group.target.set_stroke(opacity=VOXELS_STROKE_OPACITY/VOLUME_SIZE/4)
 
         self.play(
@@ -187,10 +191,10 @@ class SolidTokenization(ThreeDScene):
                 for cube in cubes
             ],
             lag_ratio=1/(VOLUME_SIZE**3),
-            run_time=8,
+            run_time=8.5,
         ))
 
-        self.stop_ambient_camera_rotation()  # 38 seconds
+        self.stop_ambient_camera_rotation()  # 38.5 seconds
 
         # move camera to show flattened voxels
         self.play(
@@ -198,16 +202,18 @@ class SolidTokenization(ThreeDScene):
             run_time=1,
         )
 
-        self.wait(3)  # 42 seconds
+        self.wait(3)  # 42.5 seconds
 
         # split up flattened voxels into groups based on tube length
         tubes = []
+        tubes_values = []
         for i in range((VOLUME_SIZE ** 3) // TUBE_LENGTH):
             tube = VGroup(*cubes[i*TUBE_LENGTH:(i+1)*TUBE_LENGTH])
             tube.generate_target()
             tube.target.shift(RIGHT * i)
             tubes.append(tube)
-        
+            tubes_values.append(voxel_values[i*TUBE_LENGTH:(i+1)*TUBE_LENGTH])
+
         # move tubes to show splitting
         self.play(
             *[
@@ -218,9 +224,10 @@ class SolidTokenization(ThreeDScene):
         )
 
         tube_labels = []
-        for tube in tubes:
-            token_idx = TUBE_TO_TOKENS[tuple([int(cube.fill_opacity) for cube in tube])]
-            label = Integer(token_idx, color=WHITE, font_size=96).next_to(tube, OUT * 2).rotate(90 * DEGREES, axis=RIGHT)
+        for tube, tube_values in zip(tubes, tubes_values):
+            token_idx = TUBE_TO_TOKENS[tuple(tube_values)]
+            print(token_idx)
+            label = Integer(token_idx, color=WHITE, font_size=96).next_to(tube, OUT * 3).rotate(90 * DEGREES, axis=RIGHT)
             tube_labels.append(label)
         tube_labels = VGroup(*tube_labels)
 
@@ -237,8 +244,8 @@ class SolidTokenization(ThreeDScene):
                 tube_labels.animate.shift(LEFT * (TUBE_LENGTH + 1)),
                 run_time=1,
             )
-        
-        self.wait(3)  # 52 seconds
+
+        self.wait(3)  # 52.5 seconds
 
         # replace the tubes with words as an example of tokenization
         example_sentence = "The quick brown fox jumps over the lazy dog"
@@ -256,4 +263,6 @@ class SolidTokenization(ThreeDScene):
             run_time=3,
         ))
 
-        self.wait(3)  # 58 seconds
+        self.wait(3)  # 58.5 seconds
+
+# TODO: another scene just quickly showing the token mappings from tubes to token indices
