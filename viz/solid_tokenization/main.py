@@ -19,8 +19,6 @@ TUBE_TO_TOKENS = {
     for token, tube in enumerate(TUBE_TOKENS)
 }
 
-print(TUBE_TO_TOKENS)
-
 
 class SolidTokenization(ThreeDScene):
     def construct(self):
@@ -228,7 +226,6 @@ class SolidTokenization(ThreeDScene):
         tube_labels = []
         for tube, tube_values in zip(tubes, tubes_values):
             token_idx = TUBE_TO_TOKENS[tuple(tube_values)]
-            print(token_idx)
             label = Integer(token_idx, color=WHITE, font_size=96).next_to(tube, OUT * 3).rotate(90 * DEGREES, axis=RIGHT)
             tube_labels.append(label)
         tube_labels = VGroup(*tube_labels)
@@ -250,7 +247,7 @@ class SolidTokenization(ThreeDScene):
         self.wait(3)  # 52.5 seconds
 
         # replace the tubes with words as an example of tokenization
-        example_sentence = "The quick brown fox jumps over the lazy dog"
+        example_sentence = "The quick brown fox jumps over the lazy dog ."
         example_tokens = example_sentence.split()
         token_labels = []
         for i, token in enumerate(example_tokens):
