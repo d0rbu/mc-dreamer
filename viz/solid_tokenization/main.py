@@ -29,17 +29,17 @@ class SolidTokenization(ThreeDScene):
             NumberLine(x_range=[0, VOLUME_SIZE, 1], color=RED).shift(DOWN * VOLUME_SIZE/2, IN * VOLUME_SIZE/2),
             NumberLine(x_range=[0, VOLUME_SIZE, 1], color=RED).rotate(90 * DEGREES, axis=RIGHT).shift(DOWN * VOLUME_SIZE/2, IN * VOLUME_SIZE/2),
         )
-        x_label = Integer(VOLUME_SIZE, color=RED, font_size=12*VOLUME_SIZE).next_to(x_axis, DOWN * 2).rotate(-90 * DEGREES, axis=OUT).rotate(-90 * DEGREES, axis=UP)
+        x_label = Integer(VOLUME_SIZE, color=RED, font_size=12*VOLUME_SIZE).next_to(x_axis, DOWN * 3).rotate(-90 * DEGREES, axis=OUT).rotate(-90 * DEGREES, axis=UP)
         z_axis = VGroup(
             NumberLine(x_range=[0, VOLUME_SIZE, 1], color=GREEN).rotate(90 * DEGREES, axis=UP).shift(LEFT * VOLUME_SIZE/2, DOWN * VOLUME_SIZE/2),
             NumberLine(x_range=[0, VOLUME_SIZE, 1], color=GREEN).rotate(90 * DEGREES, axis=UP).rotate(90 * DEGREES, axis=OUT).shift(LEFT * VOLUME_SIZE/2, DOWN * VOLUME_SIZE/2),
         )
-        z_label = Integer(VOLUME_SIZE, color=GREEN, font_size=12*VOLUME_SIZE).next_to(z_axis, DOWN * 2).rotate(-90 * DEGREES, axis=OUT).rotate(-90 * DEGREES, axis=UP)
+        z_label = Integer(VOLUME_SIZE, color=GREEN, font_size=12*VOLUME_SIZE).next_to(z_axis, DOWN * 3).rotate(-90 * DEGREES, axis=OUT).rotate(-90 * DEGREES, axis=UP)
         y_axis = VGroup(
             NumberLine(x_range=[0, VOLUME_SIZE, 1], color=BLUE).rotate(90 * DEGREES, axis=OUT).shift(LEFT * VOLUME_SIZE/2, IN * VOLUME_SIZE/2),
             NumberLine(x_range=[0, VOLUME_SIZE, 1], color=BLUE).rotate(90 * DEGREES, axis=OUT).rotate(90 * DEGREES, axis=UP).shift(LEFT * VOLUME_SIZE/2, IN * VOLUME_SIZE/2),
         )
-        y_label = Integer(VOLUME_SIZE, color=BLUE, font_size=12*VOLUME_SIZE).next_to(y_axis, IN * 2).rotate(-90 * DEGREES, axis=OUT).rotate(-90 * DEGREES, axis=UP)
+        y_label = Integer(VOLUME_SIZE, color=BLUE, font_size=12*VOLUME_SIZE).next_to(y_axis, IN * 3).rotate(-90 * DEGREES, axis=OUT).rotate(-90 * DEGREES, axis=UP)
         side_axes = VGroup(
             x_axis,
             x_label,
@@ -181,7 +181,7 @@ class SolidTokenization(ThreeDScene):
 
         for i, cube in enumerate(cubes):
             cube.generate_target()
-            cube.target.move_to(ORIGIN + RIGHT * (i - VOLUME_SIZE/2 + 0.5))
+            cube.target.move_to(ORIGIN + RIGHT * (i - TUBE_LENGTH/2 + 0.5))
             cube.target.set_stroke(opacity=1.0)
 
         # move voxels to show flattening
@@ -191,10 +191,10 @@ class SolidTokenization(ThreeDScene):
                 for cube in cubes
             ],
             lag_ratio=1/(VOLUME_SIZE**3),
-            run_time=8.5,
+            run_time=8.4,
         ))
 
-        self.stop_ambient_camera_rotation()  # 38.5 seconds
+        self.stop_ambient_camera_rotation()  # 38.4 seconds
 
         # move camera to show flattened voxels
         self.play(
@@ -202,7 +202,7 @@ class SolidTokenization(ThreeDScene):
             run_time=1,
         )
 
-        self.wait(3)  # 42.5 seconds
+        self.wait(3)  # 42.4 seconds
 
         # split up flattened voxels into groups based on tube length
         tubes = []
@@ -226,7 +226,7 @@ class SolidTokenization(ThreeDScene):
         tube_labels = []
         for tube, tube_values in zip(tubes, tubes_values):
             token_idx = TUBE_TO_TOKENS[tuple(tube_values)]
-            label = Integer(token_idx, color=WHITE, font_size=96).next_to(tube, OUT * 3).rotate(90 * DEGREES, axis=RIGHT)
+            label = Integer(token_idx, color=WHITE, font_size=128).next_to(tube, OUT * 5).rotate(90 * DEGREES, axis=RIGHT)
             tube_labels.append(label)
         tube_labels = VGroup(*tube_labels)
 
@@ -241,17 +241,17 @@ class SolidTokenization(ThreeDScene):
             self.play(
                 cubes_group.animate.shift(LEFT * (TUBE_LENGTH + 1)),
                 tube_labels.animate.shift(LEFT * (TUBE_LENGTH + 1)),
-                run_time=1,
+                run_time=1.5,
             )
 
-        self.wait(3)  # 52.5 seconds
+        self.wait(3)  # 54.4 seconds
 
         # replace the tubes with words as an example of tokenization
         example_sentence = "The quick brown fox jumps over the lazy dog ."
         example_tokens = example_sentence.split()
         token_labels = []
         for i, token in enumerate(example_tokens):
-            token_labels.append(Text(token, color=WHITE, font="Consolas", font_size=48).rotate(90 * DEGREES, axis=RIGHT).next_to(tubes[i], ORIGIN))
+            token_labels.append(Text(token, color=WHITE, font="Consolas", font_size=96).rotate(90 * DEGREES, axis=RIGHT).next_to(tubes[i], ORIGIN))
 
         self.play(LaggedStart(
             *[
@@ -262,6 +262,6 @@ class SolidTokenization(ThreeDScene):
             run_time=3,
         ))
 
-        self.wait(3)  # 58.5 seconds
+        self.wait(3)  # 60.4 seconds
 
 # TODO: another scene just quickly showing the token mappings from tubes to token indices
