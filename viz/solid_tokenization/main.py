@@ -3,14 +3,14 @@ from manim import *
 from itertools import product
 
 
-VOLUME_SIZE = 8
-TUBE_LENGTH = 4
+VOLUME_SIZE = 16
+TUBE_LENGTH = 8
 FILL_OPACITY = 0.4
 VOXELS_FILL_OPACITY = 0.1
 VOXELS_STROKE_OPACITY = 1
 CAMERA_ROTATION_RATE = 3 * DEGREES  # n degrees per second
 
-TUBE_TOKENS = np.arange(TUBE_LENGTH ** 2).reshape(TUBE_LENGTH ** 2, 1).repeat(TUBE_LENGTH, axis=1)
+TUBE_TOKENS = np.arange(2 ** TUBE_LENGTH).reshape(2 ** TUBE_LENGTH, 1).repeat(TUBE_LENGTH, axis=1)
 for i in range(TUBE_LENGTH):
     TUBE_TOKENS[:, (-1-i)] = TUBE_TOKENS[:, (-1-i)] // (2 ** i) % 2
 
@@ -18,6 +18,8 @@ TUBE_TO_TOKENS = {
     tuple(tube.tolist()): token
     for token, tube in enumerate(TUBE_TOKENS)
 }
+
+print(TUBE_TO_TOKENS)
 
 
 class SolidTokenization(ThreeDScene):
