@@ -195,6 +195,7 @@ class ColorModule(BitDiffusion):
         pos_embedding_dim: int | None = None,
         projection_ratio: float = 4.,
         num_ctrl_tokens: int = 4,
+        do_ema: bool = True,
         ema_beta: float = 0.9999,
         ema_update_after_step: int = 2000,  # lag time for the ema to not include the initial garbage initializations
         ema_update_every: int = 100,  # how often to actually update ema model
@@ -207,27 +208,30 @@ class ColorModule(BitDiffusion):
 
         self.ctrl_emb = ControlEmbedder(ctrl_dim, sample_size, pos_embedding_dim, projection_ratio, num_ctrl_tokens)
         self.norm_backward = partial(self.bit2int, nbits=num_bits, scale=bit_scale)
-        self.ema = EMA(
-            model,
-            beta=ema_beta,
-            update_after_step=ema_update_after_step,
-            update_every=ema_update_every,
-            include_online_model=False,
-        )
-        self.ctrl_emb_ema = EMA(
-            self.ctrl_emb,
-            beta=ema_beta,
-            update_after_step=ema_update_after_step,
-            update_every=ema_update_every,
-            include_online_model=False,
-        )
+        self.do_ema = do_ema
+
+        if self.do_ema:
+            self.ema = EMA(
+                model,
+                beta=ema_beta,
+                update_after_step=ema_update_after_step,
+                update_every=ema_update_every,
+                include_online_model=False,
+            )
+            self.ctrl_emb_ema = EMA(
+                self.ctrl_emb,
+                beta=ema_beta,
+                update_after_step=ema_update_after_step,
+                update_every=ema_update_every,
+                include_online_model=False,
+            )
 
     def validation_step(self, batch : dict[str, th.Tensor], batch_idx : int) -> th.Tensor:
         # Extract the starting images from data batch
         x_0  = batch[self.data_key]
         ctrl = batch[self.ctrl_key] if exists(self.ctrl_key) else None
 
-        loss = self.compute_loss(x_0, ctrl=ctrl, use_ema=True)
+        loss = self.compute_loss(x_0, ctrl=ctrl, use_ema=self.do_ema)
 
         self.log_dict({"val_loss" : loss}, logger=True, on_step=True, sync_dist=True)
 

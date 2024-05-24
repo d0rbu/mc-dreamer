@@ -8,6 +8,7 @@ MODEL:
   num_heads: 8
   ctrl_dim: 256
   num_ctrl_tokens: 8
+  do_ema: true
   ema_beta: 0.998
   ema_update_after_step: 20000
   ema_update_every: 100
