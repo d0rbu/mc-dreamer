@@ -8,8 +8,9 @@ MODEL:
   num_heads: 8
   ctrl_dim: 256
   num_ctrl_tokens: 8
-  ema_beta: 0.996
-  ema_update_after_step: 8000
+  num_group: 8
+  ema_beta: 0.998
+  ema_update_after_step: 20000
   ema_update_every: 100
 DIFFUSION:
   img_size: [16, 16, 16]
@@ -24,7 +25,7 @@ OPTIMIZER:
   min_lr: 0.00001
   plateau_patience: 10
 DATASET:
-  batch_size: 64
+  batch_size: 128
 TRAINING:
   mode: color
   accumulate_grad_batches: 4
@@ -32,5 +33,5 @@ TRAINING:
   gradient_clip_val: 1.0
   accelerator: gpu
   steps: -1  # infinite
-  val_check_interval: 1000
+  val_check_interval: 100
   ckpt_dir: checkpoints_color

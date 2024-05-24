@@ -1,5 +1,6 @@
 import math
 import yaml
+import wandb
 import torch as th
 import torch.nn as nn
 from functools import partial
@@ -200,6 +201,9 @@ class ColorModule(BitDiffusion):
         **kwargs,
     ) -> None:
         super().__init__(model=model, num_bits=num_bits, bit_scale=bit_scale, **kwargs)
+
+        wandb.init()
+        wandb.watch(self.model, log="all", log_freq=500, log_graph=False)
 
         self.ctrl_emb = ControlEmbedder(ctrl_dim, sample_size, pos_embedding_dim, projection_ratio, num_ctrl_tokens)
         self.norm_backward = partial(self.bit2int, nbits=num_bits, scale=bit_scale)
