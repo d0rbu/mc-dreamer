@@ -226,6 +226,18 @@ class ColorModule(BitDiffusion):
                 include_online_model=False,
             )
 
+    # * Lightning Module functions
+    def training_step(self, batch : dict[str, th.Tensor], batch_idx : int) -> th.Tensor:
+        # Extract the starting images from data batch
+        x_0  = batch[self.data_key]
+        ctrl = batch[self.ctrl_key] if exists(self.ctrl_key) else None
+
+        loss = self.compute_loss(x_0, ctrl = ctrl)
+
+        self.log_dict({'train_loss' : loss}, logger = True, on_step = True, sync_dist = True)
+
+        return loss
+
     def validation_step(self, batch : dict[str, th.Tensor], batch_idx : int) -> th.Tensor:
         # Extract the starting images from data batch
         x_0  = batch[self.data_key]
