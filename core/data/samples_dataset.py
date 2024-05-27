@@ -177,6 +177,7 @@ class WorldSampleDataset(Dataset):
             return structure, y_index, prev_tube_structure, next_tube_structure
         elif self.dataset_mode == WorldSampleDatasetMode.COLOR:
             return {
+                "block_count": (sample > 0).sum().cpu(),
                 "sample": sample.unsqueeze(0),
                 "control": {
                     "structure": sample > 0,

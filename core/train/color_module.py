@@ -237,6 +237,7 @@ class ColorModule(BitDiffusion):
         loss = self.compute_loss(x_0, ctrl = ctrl)
 
         self.log_dict({'train_loss' : loss}, logger = True, on_step = True, sync_dist = True)
+        self.log_dict({"train_batch_total_block_count" : batch["block_count"].sum()}, logger = True, on_step = True, sync_dist = True)
 
         return loss
 
@@ -248,6 +249,7 @@ class ColorModule(BitDiffusion):
         loss = self.compute_loss(x_0, ctrl=ctrl, use_ema=self.do_ema)
 
         self.log_dict({"val_loss" : loss}, logger=True, on_step=True, sync_dist=True)
+        self.log_dict({"val_batch_total_block_count" : batch["block_count"].sum()}, logger = True, on_step = True, sync_dist = True)
 
         self.val_outs = ((x_0, ctrl),)
 
