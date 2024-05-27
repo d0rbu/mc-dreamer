@@ -12,6 +12,7 @@ MODEL:
   ema_beta: 0.998
   ema_update_after_step: 20000
   ema_update_every: 100
+  average_loss_by_block: true
 DIFFUSION:
   img_size: [16, 16, 16]
   num_bits: 8

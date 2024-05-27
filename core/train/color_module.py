@@ -199,6 +199,7 @@ class ColorModule(BitDiffusion):
         ema_beta: float = 0.9999,
         ema_update_after_step: int = 2000,  # lag time for the ema to not include the initial garbage initializations
         ema_update_every: int = 100,  # how often to actually update ema model
+        average_loss_by_block: bool = False,  # if true, the loss will be averaged across all blocks. if false, it will be averaged across batch samples
         **kwargs,
     ) -> None:
         super().__init__(model=model, num_bits=num_bits, bit_scale=bit_scale, **kwargs)
@@ -209,6 +210,7 @@ class ColorModule(BitDiffusion):
         self.ctrl_emb = ControlEmbedder(ctrl_dim, sample_size, pos_embedding_dim, projection_ratio, num_ctrl_tokens)
         self.norm_backward = partial(self.bit2int, nbits=num_bits, scale=bit_scale)
         self.do_ema = do_ema
+        self.average_loss_by_block = average_loss_by_block
 
         if self.do_ema:
             self.ema = EMA(
@@ -474,17 +476,33 @@ class ColorModule(BitDiffusion):
         x_p = self.predict(x_t, sig, x_c = x_c, ctrl = ctrl, use_ema = use_ema)
         structure = structure.expand(bs, bits, *structure.shape[2:])  # (B, N, Y, Z, X)
 
-        # Compute the distribution loss ONLY for blocks that are solid in the structures
-        loss = self.criterion(x_p[structure], x_0[structure], reduction = "none")  # (D)
+        if self.average_loss_by_block:
+            # Weighs samples in the batch according to how many solid blocks they have, discounting samples that have very few blocks
 
-        batch_loss_weight = self.loss_weight(sig)  # (B)
-        bit_loss_weight = th.repeat_interleave(batch_loss_weight, bits)  # (B * N)
-        structure_block_sizes = structure.sum(dim=[-1, -2, -3]).flatten()  # (B * N)
+            # Compute the distribution loss ONLY for blocks that are solid in the structures
+            loss = self.criterion(x_p[structure], x_0[structure], reduction = "none")  # (D,)
 
-        block_loss_weight = th.repeat_interleave(bit_loss_weight, structure_block_sizes)  # (D)
+            batch_loss_weight = self.loss_weight(sig)  # (B,)
+            bit_loss_weight = th.repeat_interleave(batch_loss_weight, bits)  # (B * N,)
+            structure_block_sizes = structure.sum(dim=[-1, -2, -3]).flatten()  # (B * N,)
 
-        # Add loss weight (fixed to be by block instead of by batch)
-        loss *= block_loss_weight
+            block_loss_weight = th.repeat_interleave(bit_loss_weight, structure_block_sizes)  # (D,)
+
+            # Add loss weight (fixed to be by block instead of by batch)
+            loss *= block_loss_weight
+        else:
+            # Weighs each sample in the batch equally, discounting overly influential extremely full samples
+            loss = self.criterion(x_p, x_0, reduction = "none")  # (B, N, Y, Z, X)
+
+            # Compute average only over blocks in the structure
+            bits_per_batch = structure.sum(dim=[-1, -2, -3])  # (B, N)
+            loss = (loss * structure).sum(dim=[-1, -2, -3]) / bits_per_batch  # (B, N)
+            loss = loss.mean(dim=-1)  # (B,)
+
+            # Add loss weight
+            batch_loss_weight = self.loss_weight(sig)  # (B,)
+            loss *= batch_loss_weight
+
         return loss.mean()
 
     def predict(
