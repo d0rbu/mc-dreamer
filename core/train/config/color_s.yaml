@@ -13,10 +13,11 @@ MODEL:
   ema_update_after_step: 20000
   ema_update_every: 100
   average_loss_by_block: false
+  watch_model: false
 DIFFUSION:
   img_size: [16, 16, 16]
   num_bits: 8
-  sample_steps: 512
+  sample_steps: 1024
 OPTIMIZER:
   lr: 0.0001
   wd: 0.0004
@@ -34,5 +35,5 @@ TRAINING:
   gradient_clip_val: 1.0
   accelerator: gpu
   steps: -1  # infinite
-  val_check_interval: 100
+  val_check_interval: 200
   ckpt_dir: checkpoints_color

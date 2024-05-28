@@ -200,17 +200,21 @@ class ColorModule(BitDiffusion):
         ema_update_after_step: int = 2000,  # lag time for the ema to not include the initial garbage initializations
         ema_update_every: int = 100,  # how often to actually update ema model
         average_loss_by_block: bool = False,  # if true, the loss will be averaged across all blocks. if false, it will be averaged across batch samples
+        watch_model: bool = False,  # whether to track model params and gradients
         **kwargs,
     ) -> None:
         super().__init__(model=model, num_bits=num_bits, bit_scale=bit_scale, **kwargs)
-
-        wandb.init()
-        wandb.watch(self.model, log="all", log_freq=500, log_graph=False)
 
         self.ctrl_emb = ControlEmbedder(ctrl_dim, sample_size, pos_embedding_dim, projection_ratio, num_ctrl_tokens)
         self.norm_backward = partial(self.bit2int, nbits=num_bits, scale=bit_scale)
         self.do_ema = do_ema
         self.average_loss_by_block = average_loss_by_block
+        self.watch_model = watch_model
+
+        if watch_model:
+            wandb.init()
+            wandb.watch(self.model, log="all", log_freq=500, log_graph=False)
+            wandb.watch(self.ctrl_emb, log="all", log_freq=500, log_graph=False)
 
         if self.do_ema:
             self.ema = EMA(
@@ -237,7 +241,9 @@ class ColorModule(BitDiffusion):
         loss = self.compute_loss(x_0, ctrl = ctrl)
 
         self.log_dict({'train_loss' : loss}, logger = True, on_step = True, sync_dist = True)
-        self.log_dict({"train_batch_total_block_count" : batch["block_count"].sum()}, logger = True, on_step = True, sync_dist = True)
+
+        if self.watch_model:
+            self.log_dict({"train_batch_total_block_count" : batch["block_count"].sum().float()}, logger = True, on_step = True, sync_dist = True)
 
         return loss
 
@@ -249,7 +255,9 @@ class ColorModule(BitDiffusion):
         loss = self.compute_loss(x_0, ctrl=ctrl, use_ema=self.do_ema)
 
         self.log_dict({"val_loss" : loss}, logger=True, on_step=True, sync_dist=True)
-        self.log_dict({"val_batch_total_block_count" : batch["block_count"].sum()}, logger = True, on_step = True, sync_dist = True)
+
+        if self.watch_model:
+            self.log_dict({"val_batch_total_block_count" : batch["block_count"].sum().float()}, logger = True, on_step = True, sync_dist = True)
 
         self.val_outs = ((x_0, ctrl),)
 
