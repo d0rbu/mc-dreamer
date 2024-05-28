@@ -170,3 +170,4 @@ schematics_outputs/*
 wandb/*
 *.ckpt
 checkpoints*
+media*
