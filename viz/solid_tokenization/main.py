@@ -264,4 +264,33 @@ class SolidTokenization(ThreeDScene):
 
         self.wait(3)  # 60.4 seconds
 
-# TODO: another scene just quickly showing the token mappings from tubes to token indices
+
+GRID_ROWS = 4
+GRID_COLS = 6
+
+class TokenMappings(Scene):
+    def construct(self):
+        # arrange tubes and token index mappings
+        tubes_and_labels = []
+        for token_idx, (tube, _) in enumerate(zip(TUBE_TOKENS, range(GRID_ROWS * GRID_COLS - 1))):
+            tube_group = VGroup(*[
+                Square(fill_opacity=tube[i], stroke_width=1.5, side_length=1.2/tube.shape[0], stroke_color=WHITE)
+                for i in range(TUBE_LENGTH)
+            ]).arrange(RIGHT, buff=0)
+            label = Integer(token_idx, color=WHITE, font_size=30).next_to(tube_group, UP / tube.shape[0] + UP)
+            tubes_and_labels.append(VGroup(tube_group, label))
+
+        tubes_and_labels.append(Text("...", color=WHITE, font="Consolas", font_size=48))
+
+        tubes_and_labels = VGroup(*tubes_and_labels).arrange_in_grid(GRID_ROWS, GRID_COLS, buff=1, flow_order="dr").shift(DOWN / TUBE_LENGTH)
+
+        self.play(LaggedStart(
+            *[
+                Write(tube_and_label)
+                for tube_and_label in tubes_and_labels
+            ],
+            lag_ratio=0.2,
+            run_time=3,
+        ))
+
+        self.pause(8)  # 11 seconds
