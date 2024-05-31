@@ -36,4 +36,4 @@ TRAINING:
   accelerator: gpu
   steps: -1  # infinite
   val_check_interval: 100
-  ckpt_dir: checkpoints_color
+  ckpt_dir: checkpoints_color_test
