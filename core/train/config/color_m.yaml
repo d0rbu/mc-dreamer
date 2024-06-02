@@ -10,7 +10,7 @@ MODEL:
   num_ctrl_tokens: 4
   do_ema: true
   ema_beta: 0.998
-  ema_update_after_step: 20000
+  ema_update_after_step: 10000
   ema_update_every: 100
   average_loss_by_block: false
   watch_model: false

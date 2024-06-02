@@ -10,7 +10,7 @@ MODEL:
   num_ctrl_tokens: 4
   do_ema: true
   ema_beta: 0.998
-  ema_update_after_step: 20000
+  ema_update_after_step: 10000
   ema_update_every: 100
   average_loss_by_block: false
   watch_model: false
@@ -19,18 +19,18 @@ DIFFUSION:
   num_bits: 8
   sample_steps: 512
 OPTIMIZER:
-  lr: 0.00016
-  wd: 0.0004
+  lr: 0.0002
+  wd: 0.0001
   warmup_steps: 1000
   restart_interval: 1000
   lr_decay: 0.8
   min_lr: 0.00001
   plateau_patience: 10
 DATASET:
-  batch_size: 128
+  batch_size: 256
 TRAINING:
   mode: color
-  accumulate_grad_batches: 2
+  accumulate_grad_batches: 1
   precision: 32
   gradient_clip_val: 1.0
   accelerator: gpu

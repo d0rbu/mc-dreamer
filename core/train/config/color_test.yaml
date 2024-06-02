@@ -27,10 +27,10 @@ OPTIMIZER:
   min_lr: 0.00001
   plateau_patience: 10
 DATASET:
-  batch_size: 128
+  batch_size: 256
 TRAINING:
   mode: color
-  accumulate_grad_batches: 2
+  accumulate_grad_batches: 1
   precision: 32
   gradient_clip_val: 1.0
   accelerator: gpu

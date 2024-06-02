@@ -1,36 +1,36 @@
 MODEL:
-  net_dim: 128
+  net_dim: 64
   channels: 8  # shouldn't change, 8 channels to represent 2^8 = 256 block types
-  attn_dim: 192
+  attn_dim: 256
   num_group: 8
   chn_mult: [1, 2, 4]
   projection_ratio: 3.
   num_heads: 8
-  ctrl_dim: 192
+  ctrl_dim: 256
   num_ctrl_tokens: 4
   do_ema: true
   ema_beta: 0.998
-  ema_update_after_step: 20000
+  ema_update_after_step: 10000
   ema_update_every: 100
   average_loss_by_block: false
   watch_model: false
 DIFFUSION:
   img_size: [16, 16, 16]
   num_bits: 8
-  sample_steps: 256
+  sample_steps: 512
 OPTIMIZER:
-  lr: 0.00016
-  wd: 0.001
+  lr: 0.0002
+  wd: 0.0002
   warmup_steps: 1000
   restart_interval: 1000
   lr_decay: 0.8
   min_lr: 0.00001
   plateau_patience: 10
 DATASET:
-  batch_size: 96
+  batch_size: 256
 TRAINING:
   mode: color
-  accumulate_grad_batches: 3
+  accumulate_grad_batches: 1
   precision: 32
   gradient_clip_val: 1.0
   accelerator: gpu
