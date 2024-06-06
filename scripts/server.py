@@ -25,6 +25,7 @@ parser.add_argument("--ckpt_color", type=str, default=os.path.join("checkpoints_
 parser.add_argument("--config", type=str, default=os.path.join("core", "train", "config", "structure_default.yaml"))
 parser.add_argument("--config_color", type=str, default=os.path.join("core", "train", "config", "color_default.yaml"))
 parser.add_argument("--port", type=int, default=8001)
+parser.add_argument("--ngrok", action="store_true")
 
 args = parser.parse_args()
 
@@ -75,9 +76,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-print("Setting up ngrok tunnel...")
-http_tunnel = ngrok.connect(args.port, "http")
-print(http_tunnel)
+if args.ngrok:
+    print("Setting up ngrok tunnel...")
+    http_tunnel = ngrok.connect(args.port, "http")
+    print(http_tunnel)
 
 def greedy(probs: th.Tensor) -> th.Tensor:
     return th.argmax(probs, dim=-1)
