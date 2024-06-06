@@ -23,7 +23,7 @@ parser.add_argument("--only_structure", action="store_true")
 parser.add_argument("--ckpt", type=str, default=os.path.join("checkpoints", "epoch=0-step=6000.ckpt"))
 parser.add_argument("--ckpt_color", type=str, default=os.path.join("checkpoints_color", "last.ckpt"))
 parser.add_argument("--config", type=str, default=os.path.join("core", "train", "config", "structure_default.yaml"))
-parser.add_argument("--config_color", type=str, default=os.path.join("core", "train", "config", "color_default.yaml"))
+parser.add_argument("--config_color", type=str, default=os.path.join("core", "train", "config", "color_s.yaml"))
 parser.add_argument("--port", type=int, default=8001)
 
 args = parser.parse_args()

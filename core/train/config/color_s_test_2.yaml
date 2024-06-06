@@ -12,7 +12,7 @@ MODEL:
   ema_beta: 0.998
   ema_update_after_step: 10000
   ema_update_every: 100
-  average_loss_by_block: true
+  average_loss_by_block: false
   watch_model: false
 DIFFUSION:
   img_size: [16, 16, 16]
@@ -36,4 +36,4 @@ TRAINING:
   accelerator: gpu
   steps: -1  # infinite
   val_check_interval: 1000
-  ckpt_dir: checkpoints_color
+  ckpt_dir: checkpoints_color_test_2
