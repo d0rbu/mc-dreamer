@@ -42,19 +42,6 @@ if not args.only_color:
     del ckpt
 
 if not args.only_structure:
-    with open(args.config_color, "r") as file:
-        conf = yaml.safe_load(file)
-
-        # First flatten conf
-        defaults = {
-            key: value for key, value in chain(*[category.items() for category in conf.values() if isinstance(category, dict)])
-        }
-
-        # Then update any args that are None with the defaults
-        for key, value in defaults.items():
-            if getattr(args, key, None) is None:
-                setattr(args, key, value)
-
     print("Loading color model...")
     color_model = ColorModule.from_conf(args.config_color)
     ckpt = th.load(args.ckpt_color)
