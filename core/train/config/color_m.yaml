@@ -1,13 +1,13 @@
 MODEL:
   net_dim: 128
   channels: 8  # shouldn't change, 8 channels to represent 2^8 = 256 block types
-  attn_dim: 192
+  attn_dim: 1024
   num_group: 8
   chn_mult: [1, 2, 4, 8]
   projection_ratio: 3.
   num_heads: 8
-  ctrl_dim: 192
-  num_ctrl_tokens: 4
+  ctrl_dim: 1024
+  num_ctrl_tokens: 8
   do_ema: true
   ema_beta: 0.998
   ema_update_after_step: 10000
@@ -19,8 +19,8 @@ DIFFUSION:
   num_bits: 8
   sample_steps: 512
 OPTIMIZER:
-  lr: 0.00016
-  wd: 0.001
+  lr: 0.0002
+  wd: 0.0001
   warmup_steps: 1000
   restart_interval: 1000
   lr_decay: 0.8
