@@ -55,10 +55,8 @@ if not args.only_structure:
             if getattr(args, key, None) is None:
                 setattr(args, key, value)
 
-    model_kwargs = vars(args)
-
     print("Loading color model...")
-    color_model = ColorModule.from_conf(model_kwargs.pop("config_color"), **model_kwargs)
+    color_model = ColorModule.from_conf(args.config_color)
     ckpt = th.load(args.ckpt_color)
     color_model.load_state_dict(ckpt["state_dict"])
     color_model.cuda()
