@@ -128,7 +128,7 @@ class StructureModule(L.LightningModule):
         y_indices: th.Tensor,
         **kwargs: dict[str, Any],
     ) -> tuple | CausalLMOutputWithPast:
-        return self.model(x, y_indices, **kwargs)
+        return self.model(x, position_ids=y_indices, **kwargs)
 
     def _tube_batch_to_sequence(self, structure: th.Tensor, prev_tube: th.Tensor | None = None, next_tube: th.Tensor | None = None) -> th.Tensor:
         batch_size = structure.shape[0]
