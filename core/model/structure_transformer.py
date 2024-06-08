@@ -59,7 +59,7 @@ class StructureTransformer(nn.Module):
         x[special_tokens_mask] = -x[special_tokens_mask]
         x[~special_tokens_mask] += self.model.config.num_special_tokens
 
-        x = self.model(x, position_ids=y_indices)  # (B, T) -> (B, T, num_token_types)
+        x = self.model(x, start_pos_indices=y_indices)  # (B, T) -> (B, T, num_token_types)
 
         # turn distribution of tube types into distribution of solid/air blocks and special tokens
         x = th.cat([x[..., :self.num_tube_types] @ self.idx_to_tube, x[..., self.num_tube_types:]], dim = -1)  # (B, T, num_token_types) -> (B, T, tube_length + num_special_tokens)

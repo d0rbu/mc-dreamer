@@ -1,0 +1,31 @@
+MODEL:
+  hidden_size: 1024
+  intermediate_size: 2816
+  num_hidden_layers: 16
+  num_attention_heads: 16
+  hidden_act: silu
+  max_position_embeddings: 1024
+  pad_token_id: 0
+  bos_token_id: 1
+  eos_token_id: 2
+  num_special_tokens: 3
+OPTIMIZER:
+  lr: 0.0006
+  wd: 0.01
+  warmup_steps: 1000
+  restart_interval: 1000
+  lr_decay: 0.8
+  min_lr: 0.00006
+  plateau_patience: 10
+DATASET:
+  batch_size: 64
+  tube_length: 8
+TRAINING:
+  mode: structure
+  accumulate_grad_batches: 16
+  precision: 32
+  gradient_clip_val: 1.0
+  accelerator: gpu
+  steps: -1  # infinite
+  val_check_interval: 1000
+  ckpt_dir: checkpoints_test

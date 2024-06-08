@@ -70,8 +70,8 @@ class SinkFormer(LlamaModel):
         **kwargs,
     ) -> th.Tensor:
         if position_ids is None and start_pos_indices is not None:
-            position_ids = th.arange(input_ids.shape[1], device=input_ids.device)
-            position_ids += start_pos_indices
+            position_ids = th.arange(input_ids.shape[1], device=input_ids.device).unsqueeze(0).expand(input_ids.shape[0], -1)
+            position_ids += start_pos_indices.unsqueeze(-1)
 
         # set up initial sink key values
         if past_key_values is None or \
