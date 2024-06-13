@@ -1,6 +1,6 @@
 MODEL:
   hidden_size: 1024
-  intermediate_size: 2816
+  intermediate_size: 2752
   num_hidden_layers: 16
   num_attention_heads: 16
   hidden_act: silu
@@ -18,7 +18,7 @@ OPTIMIZER:
   min_lr: 0.00006
   plateau_patience: 10
 DATASET:
-  batch_size: 64
+  batch_size: 32
   tube_length: 8
 TRAINING:
   mode: structure
