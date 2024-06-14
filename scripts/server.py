@@ -23,7 +23,7 @@ parser.add_argument("--only_structure", action="store_true")
 parser.add_argument("--ckpt", type=str, default=os.path.join("checkpoints", "epoch=0-step=6000.ckpt"))
 parser.add_argument("--ckpt_color", type=str, default=os.path.join("checkpoints_color", "last.ckpt"))
 parser.add_argument("--config", type=str, default=os.path.join("core", "train", "config", "structure_default.yaml"))
-parser.add_argument("--config_color", type=str, default=os.path.join("core", "train", "config", "color_default.yaml"))
+parser.add_argument("--config_color", type=str, default=os.path.join("core", "train", "config", "color_s.yaml"))
 parser.add_argument("--port", type=int, default=8001)
 parser.add_argument("--ngrok", action="store_true")
 
@@ -42,23 +42,8 @@ if not args.only_color:
     del ckpt
 
 if not args.only_structure:
-    with open(args.config_color, "r") as file:
-        conf = yaml.safe_load(file)
-
-        # First flatten conf
-        defaults = {
-            key: value for key, value in chain(*[category.items() for category in conf.values() if isinstance(category, dict)])
-        }
-
-        # Then update any args that are None with the defaults
-        for key, value in defaults.items():
-            if getattr(args, key, None) is None:
-                setattr(args, key, value)
-
-    model_kwargs = vars(args)
-
     print("Loading color model...")
-    color_model = ColorModule.from_conf(model_kwargs.pop("config_color"), **model_kwargs)
+    color_model = ColorModule.from_conf(args.config_color)
     ckpt = th.load(args.ckpt_color)
     color_model.load_state_dict(ckpt["state_dict"])
     color_model.cuda()

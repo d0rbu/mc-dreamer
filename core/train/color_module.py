@@ -173,6 +173,8 @@ class ColorModule(BitDiffusion):
         cls.conf["OPTIMIZER"] = opt_conf
 
         net_par = conf["MODEL"]
+        kwargs.update(net_par)
+
         dif_par = cls.DIFFUSION_DEFAULTS.copy()
         dif_par.update(conf["DIFFUSION"])
         kwargs.update(dif_par)
