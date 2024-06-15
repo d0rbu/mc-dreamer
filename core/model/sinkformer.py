@@ -110,3 +110,26 @@ class CausalSinkFormer(LlamaForCausalLM):
 
         # Initialize weights and apply final processing
         self.post_init()
+    
+    def forward(
+        self: Self,
+        input_ids: th.LongTensor,
+        start_pos_indices: th.Tensor | None = None,
+        position_ids: th.LongTensor | None = None,
+        attention_mask: th.Tensor | None = None,
+        past_key_values: list[th.FloatTensor] | None = None,
+        inputs_embeds: th.FloatTensor | None = None,
+        **kwargs,
+    ) -> th.Tensor:
+        if position_ids is None and start_pos_indices is not None:
+            position_ids = th.arange(input_ids.shape[1], device=input_ids.device).unsqueeze(0).repeat(input_ids.shape[0], 1)
+            position_ids += start_pos_indices.unsqueeze(-1)
+
+        return super().forward(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_values=past_key_values,
+            inputs_embeds=inputs_embeds,
+            **kwargs,
+        )

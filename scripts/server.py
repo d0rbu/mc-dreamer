@@ -118,7 +118,7 @@ def structure_generation(data: list[list[bool | None]], y: int, sampling_strateg
     current_sequence = th.tensor(current_sequence, dtype=th.float, device=model.device).unsqueeze(0)
     current_sequence = model._tube_batch_to_sequence(current_sequence, bos_tube)
 
-    y_indices = th.tensor([[y]], device=model.device)
+    y_indices = th.tensor([y], device=model.device)
     cache = None
 
     for j, i in enumerate(indices_to_generate):
