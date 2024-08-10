@@ -14,7 +14,6 @@ class WorldSampleDataModule(L.LightningDataModule):
     Data module for world sample datasets.
 
     For raw data dir, intermediate data dir, and output dir, we have the functions:
-    - scrape_data: scrape data from the internet -> raw data dir
     - extract_data: extract data from raw data dir -> intermediate data dir
     - convert_data: convert data from intermediate data dir -> output dir
     """
@@ -41,15 +40,6 @@ class WorldSampleDataModule(L.LightningDataModule):
         self.raw_data_dir = raw_data_dir
         self.intermediate_data_dir = intermediate_data_dir
         self.device = device
-
-    def scrape_data(
-        self: Self,
-        raw_data_dir: str | os.PathLike | None = None,
-    ) -> None:
-        if raw_data_dir is None:
-            raw_data_dir = self.raw_data_dir
-
-        raise NotImplementedError("Scraping data from data module not implemented")
 
     def extract_data(
         self: Self,
@@ -108,8 +98,6 @@ class WorldSampleDataModule(L.LightningDataModule):
             self.convert_data()
         elif len(os.listdir(self.raw_data_dir)) == 0:
             self.extract_data()
-        else:
-            self.scrape_data()
 
         self.prepare_data()
     
